@@ -1111,12 +1111,13 @@ function scoreOf(p) { return Math.max(0, Math.floor((p.maxDistPx - SPAWN_X) / 10
 
 // On-screen score label in Code Bullet's style (sketch.js:474 "Your Score: X" in
 // the top corners), with a dark outline so it stays legible over sky and terrain.
-function _hudText(ctx, text, x, y, align, color) {
+function _hudText(ctx, text, x, y, align, color, size) {
+  var px = size || 28;   // optional font size; defaults to the standard 28px HUD text
   ctx.save();
   ctx.textAlign = align;
-  ctx.font = "bold 28px monospace";
+  ctx.font = "bold " + px + "px monospace";
   ctx.lineJoin = "round";
-  ctx.lineWidth = 5;
+  ctx.lineWidth = px * 0.18;   // keep the outline proportional so smaller text isn't over-stroked
   ctx.strokeStyle = "rgba(0,0,0,0.65)";
   ctx.strokeText(text, x, y);
   ctx.fillStyle = color;
@@ -1154,17 +1155,21 @@ function _drawAltimeter(ctx, car, centerX, y) {
   _hudText(ctx, "⛰ Altitude " + m.toFixed(1) + " m", centerX, y, "center", "#9fd4ff");
 }
 
-// Speed meter (cheat): chassis linear-velocity magnitude in m/s. Box2D velocities
-// are already in world units (m/s; SCALE = 30 px/m), so no conversion needed.
-function _speedMetersPerSec(car) {
-  if (!car) return 0;
+// Speed meter (cheat): chassis velocity components in m/s. Box2D velocities are
+// already in world units (m/s; SCALE = 30 px/m), so no conversion needed. x>0 is
+// forward/right; world y points DOWN, so vertical is reported as -vy (positive =
+// upward) which reads more naturally than "down is positive".
+function _speedComponents(car) {
+  if (!car) return { h: 0, v: 0, total: 0 };
   var v = car.chassisBody.GetLinearVelocity();
-  return Math.sqrt(v.x * v.x + v.y * v.y);
+  return { h: v.x, v: -v.y, total: Math.sqrt(v.x * v.x + v.y * v.y) };
 }
 function _drawSpeedometer(ctx, car, centerX, y) {
   if (!bpSpeed) return;
-  var s = _speedMetersPerSec(car);
-  _hudText(ctx, "🚗 Speed " + s.toFixed(1) + " m/s", centerX, y, "center", "#ffd27f");
+  var s = _speedComponents(car);
+  _hudText(ctx, "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
+                "  Tot " + s.total.toFixed(1) + " m/s",
+           centerX, y, "center", "#ffd27f", 20);
 }
 
 function render() {
@@ -1281,7 +1286,11 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
   _hudText(ctx, ownName + " — Score " + scoreOf(ownP), 24, 48, "left",  ownColor.outline);
   _hudText(ctx, oppName + " — Score " + scoreOf(oppP), viewWidth - 24, 48, "right", oppColor.outline);
-  _drawAltimeter(ctx, ownP.car, viewWidth / 2, 88);
+  // Center meters for THIS player's car, below the score row: altimeter on top,
+  // speed under it (same stacking rule as the single-screen modes).
+  var hudY = 88;
+  if (bpAltimeter) { _drawAltimeter(ctx, ownP.car, viewWidth / 2, hudY); hudY += 32; }
+  if (bpSpeed)     { _drawSpeedometer(ctx, ownP.car, viewWidth / 2, hudY); }
 
   // A player who crossed the finish (beatTick) shows BEAT THE GAME — even after they
   // then fly off into the void and die, that's still a win, so beatTick wins over dead.

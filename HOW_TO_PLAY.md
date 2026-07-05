@@ -126,8 +126,10 @@ are unaffected (no retrain implied).
   joint/solver artifact. The camera follows the car vertically as it drifts.
   Pressing **Zero-G** again restores gravity.
 - **Altimeter (H) / Speed meter (V):** on-screen readouts for the focused car —
-  height above the ground (m) and speed (m/s). They sit top-center; when both are
-  on, altitude is on top and speed just below.
+  height above the ground (m) and speed as **H**orizontal / **V**ertical / **Tot**al
+  (m/s; vertical is positive upward). They sit top-center; when both are on, altitude
+  is on top and speed just below. In Human-vs-Human split mode each screen shows its
+  own player's meters.
 - **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
 - **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
   the active physics knobs) for offline analysis.
