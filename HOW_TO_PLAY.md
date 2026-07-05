@@ -69,8 +69,9 @@ Other buttons:
   found. "Replaying run…" appears next to the button while the replay plays.
 
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
-**Z** Zero-G + Float, **G** Restore Gravity, **R** Restart (same terrain),
-**T** Regenerate terrain, **P** Pause/Resume, **Esc** close the cheat sheet.
+**Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** speed
+meter, **R** Restart (same terrain), **T** Regenerate terrain, **P** Pause/Resume,
+**Esc** close the cheat sheet.
 
 ## 5. Racing the AI (Human vs AI mode)
 
@@ -104,22 +105,29 @@ Regenerate terrain** re-rolls the shared map and clears old runs.
 
 ## 7. Bug probe (debug panel)
 
-Below the main controls is a **🐞 Bug probe** panel for diagnosing physics
-oddities. It only acts on the **human** car, so use **Mode: Human only**. Nothing
-here persists or touches the source physics — it's all runtime, so AI/browser
-parity and the deployed model are unaffected (no retrain implied).
+Below the main controls is a **✨ Cheats** row and a **🐞 Bug probe** panel. The
+**cheats** — Invincible, Zero-G + Float, Altimeter, Speed, and the physics/motor
+knobs — apply to **every car on screen, the AI included, in all modes** (even
+AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
+for *recording* use **Mode: Human only**. Nothing here persists or touches the
+source physics — it's all runtime, so AI/browser parity and the deployed model
+are unaffected (no retrain implied).
 
 - **Recorder (always on):** every tick the human car's full state is logged
   (chassis pose + angular velocity, per-wheel motor/spin/on-ground, the motor-joint
   and suspension reaction torques, keys/action, and the flags below). The live
   `angVel … angle …` readout shows the current chassis spin.
-- **Invincible:** skips both death paths (head-touches-ground, which also splits
-  the car, and falling off the bottom) so a run never ends while you experiment.
-- **Zero-G + Float:** turns gravity off and lifts the car into open air,
-  **preserving its linear and angular velocity** (so a developing spin keeps
+- **Invincible:** skips every death path — head-touches-ground (which also splits
+  the car), falling off the bottom, **and the AI's no-progress timeout** — so no
+  car ends its run while you experiment.
+- **Zero-G + Float:** turns gravity off and lifts the car(s) into open air,
+  **preserving linear and angular velocity** (so a developing spin keeps
   going). With no gravity and no ground, any spin that grows is a pure
   joint/solver artifact. The camera follows the car vertically as it drifts.
-  **Restore gravity** undoes it.
+  Pressing **Zero-G** again restores gravity.
+- **Altimeter (H) / Speed meter (V):** on-screen readouts for the focused car —
+  height above the ground (m) and speed (m/s). They sit top-center; when both are
+  on, altitude is on top and speed just below.
 - **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
 - **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
   the active physics knobs) for offline analysis.

@@ -60,6 +60,7 @@
     <tr><td><b>Z</b></td><td>Zero-G (toggle off / on)</td></tr>
     <tr><td><b>F</b></td><td>Float car up</td></tr>
     <tr><td><b>H</b></td><td>Altimeter (toggle height readout)</td></tr>
+    <tr><td><b>V</b></td><td>Speed meter (toggle velocity readout)</td></tr>
     <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
     <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
     <tr><td><b>P</b></td><td>Pause / Resume</td></tr>
@@ -82,6 +83,7 @@
   <label style="margin-right:8px;"><input type="checkbox" id="bp_zerog" title="Toggle gravity off/on — everything keeps its velocity (Z)"> Zero-G</label>
   <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_altimeter" title="Show a live height-above-ground readout (H)"> Altimeter</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_speed" title="Show a live speed (velocity) readout (V)"> Speed</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
 </div>
 <details id="advanced_panel" style="max-width:1100px; margin:6px auto;">
@@ -93,7 +95,7 @@
   <span id="bp_live" style="margin-left:12px; color:#9f9; font-family:monospace;"></span>
 </div>
 <div id="bugprobe2" style="text-align:center; margin:4px; color:#bbb; font-size:13px;">
-  Physics knobs <span style="color:#888;">(Human only — lower the damping to unmask the spin)</span>:
+  Physics knobs <span style="color:#888;">(applies to all cars, incl. the AI — lower the damping to unmask the spin)</span>:
   chassis&nbsp;angDamp <input id="bp_chassisdamp" type="number" step="0.05" value="0.1" style="width:58px;">
   wheel&nbsp;angDamp <input id="bp_wheeldamp" type="number" step="0.1" value="1.8" style="width:58px;">
   susp&nbsp;freq <input id="bp_suspfreq" type="number" step="5" value="70" style="width:58px;">
@@ -103,7 +105,7 @@
   <button id="bp_resetphys">Reset</button>
 </div>
 <div id="bugprobe3" style="text-align:center; margin:4px; color:#bbb; font-size:13px;">
-  Motor &amp; friction <span style="color:#888;">(Human only — motor SPEED is the spin lever)</span>:
+  Motor &amp; friction <span style="color:#888;">(applies to all cars, incl. the AI — motor SPEED is the spin lever)</span>:
   motor&nbsp;speed&nbsp;× <input id="bp_motorspeed" type="number" step="0.5" value="1" style="width:54px;">
   motor&nbsp;torque&nbsp;× <input id="bp_motortorque" type="number" step="0.5" value="1" style="width:54px;">
   wheel&nbsp;friction <input id="bp_wheelfric" type="number" step="0.1" value="1.5" style="width:54px;">
@@ -406,11 +408,22 @@ var bpZeroG = false;      // gravity currently disabled?
 var bpSavedGravity = null;
 var bpInvincible = false;  // skip head-ground / fell-off death (bug probe)
 var bpAltimeter = false;   // show a live height-above-ground readout (cheat)
+var bpSpeed = false;       // show a live speed (velocity) readout (cheat, V)
 
 function _bpHumanPlayer() {
   if (typeof players === "undefined" || !players) return null;
   for (var i = 0; i < players.length; i++) if (!players[i].isAI) return players[i];
   return null;
+}
+// Every live car on screen (AI and human alike). The physics-knob cheats apply
+// to ALL of these so they affect the AI in every mode, incl. AI-only — same as
+// Zero-G (global gravity) and Float already do.
+function _bpAllCars() {
+  var out = [];
+  if (typeof players !== "undefined" && players) {
+    for (var i = 0; i < players.length; i++) if (players[i].car) out.push(players[i].car);
+  }
+  return out;
 }
 function bpSetStatus(s) { var e = document.getElementById("bp_status"); if (e) e.textContent = s; }
 
@@ -452,19 +465,21 @@ function _bpNum(id, dflt) {
 // Defaults match the source (Car.js:124 angDamp 0.1; Wheel.js:53-54 susp 70/25;
 // Wheel.js:66 wheel angDamp 1.8) so an untouched panel changes nothing.
 function bpApplyPhys(announce) {
-  var p = _bpHumanPlayer();
-  if (!p || !p.car) return;
-  var c = p.car;
+  var cars = _bpAllCars();
+  if (!cars.length) return;
   var cad = _bpNum("bp_chassisdamp", 0.1), wad = _bpNum("bp_wheeldamp", 1.8);
   var sf = _bpNum("bp_suspfreq", 70), sd = _bpNum("bp_suspdamp", 25);
   var wf = _bpNum("bp_wheelfric", 1.5);
-  try { c.chassisBody.SetAngularDamping(cad); c.chassisBody.SetAwake(true); } catch (e) {}
-  for (var i = 0; i < c.wheels.length; i++) {
-    var w = c.wheels[i];
-    try { w.body.SetAngularDamping(wad); w.body.SetAwake(true); } catch (e) {}
-    try { if (w.distJoint) { w.distJoint.SetFrequency(sf); w.distJoint.SetDampingRatio(sd); } } catch (e) {}
-    try { for (var f = w.body.GetFixtureList(); f; f = f.m_next) f.SetFriction(wf); } catch (e) {}
-    try { if (w.rimBody) w.rimBody.SetAwake(true); } catch (e) {}
+  for (var ci = 0; ci < cars.length; ci++) {
+    var c = cars[ci];
+    try { c.chassisBody.SetAngularDamping(cad); c.chassisBody.SetAwake(true); } catch (e) {}
+    for (var i = 0; i < c.wheels.length; i++) {
+      var w = c.wheels[i];
+      try { w.body.SetAngularDamping(wad); w.body.SetAwake(true); } catch (e) {}
+      try { if (w.distJoint) { w.distJoint.SetFrequency(sf); w.distJoint.SetDampingRatio(sd); } } catch (e) {}
+      try { for (var f = w.body.GetFixtureList(); f; f = f.m_next) f.SetFriction(wf); } catch (e) {}
+      try { if (w.rimBody) w.rimBody.SetAwake(true); } catch (e) {}
+    }
   }
   var modified = (cad !== 0.1) || (wad !== 1.8) || (sf !== 70) || (sd !== 25) || (wf !== 1.5);
   if (announce || modified)
@@ -479,14 +494,15 @@ function bpApplyPhys(announce) {
 function bpApplyMotorOverride() {
   var ts = _bpNum("bp_motortorque", 1), ss = _bpNum("bp_motorspeed", 1);
   if (ts === 1 && ss === 1) return;
-  var p = _bpHumanPlayer();
-  if (!p || !p.car) return;
-  var ws = p.car.wheels;
-  for (var i = 0; i < ws.length; i++) {
-    var j = ws[i].joint;
-    if (j && j.m_enableMotor) {
-      try { j.SetMaxMotorTorque(j.GetMaxMotorTorque() * ts); } catch (e) {}
-      try { j.SetMotorSpeed(j.GetMotorSpeed() * ss); } catch (e) {}
+  var cars = _bpAllCars();
+  for (var ci = 0; ci < cars.length; ci++) {
+    var ws = cars[ci].wheels;
+    for (var i = 0; i < ws.length; i++) {
+      var j = ws[i].joint;
+      if (j && j.m_enableMotor) {
+        try { j.SetMaxMotorTorque(j.GetMaxMotorTorque() * ts); } catch (e) {}
+        try { j.SetMotorSpeed(j.GetMotorSpeed() * ss); } catch (e) {}
+      }
     }
   }
 }
@@ -676,7 +692,7 @@ function _checkPlayerEndOfStep(p) {
   if (!p.beatTick && ground && p.maxDistPx >= ground.distance - 20) p.beatTick = tickCount;
   var fellOffWorld = !bpInvincible && ypx > CANVAS_HEIGHT;   // fell below the screen into the void
   if (!bpInvincible && (p.car.player.kindaDead || ypx > CANVAS_HEIGHT)) p.dead = true;
-  if (p.isAI && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
+  if (p.isAI && !bpInvincible && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
   // Freeze ONLY on a fall-off-the-world death: head-hit ragdolls stay on-screen and
   // are fine to keep tumbling, but a car that dropped off the edge would otherwise
   // fall forever and the camera would fill the screen with brown dirt. Inert in the
@@ -760,7 +776,7 @@ function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   camR.panX = camR.panY = 0;
   _accumSec = 0;
   _lastWallMs = 0;
-  bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built car
+  bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars (all of them)
 }
 
 // ---- Session terrains -------------------------------------------------------
@@ -1138,6 +1154,19 @@ function _drawAltimeter(ctx, car, centerX, y) {
   _hudText(ctx, "⛰ Altitude " + m.toFixed(1) + " m", centerX, y, "center", "#9fd4ff");
 }
 
+// Speed meter (cheat): chassis linear-velocity magnitude in m/s. Box2D velocities
+// are already in world units (m/s; SCALE = 30 px/m), so no conversion needed.
+function _speedMetersPerSec(car) {
+  if (!car) return 0;
+  var v = car.chassisBody.GetLinearVelocity();
+  return Math.sqrt(v.x * v.x + v.y * v.y);
+}
+function _drawSpeedometer(ctx, car, centerX, y) {
+  if (!bpSpeed) return;
+  var s = _speedMetersPerSec(car);
+  _hudText(ctx, "🚗 Speed " + s.toFixed(1) + " m/s", centerX, y, "center", "#ffd27f");
+}
+
 function render() {
   var cv = document.getElementById("stage");
   var ctx = cv.getContext("2d");
@@ -1181,7 +1210,13 @@ function render() {
       _drawCar(ctx, players[pi].car, players[pi].color, players[pi].isAI);
     }
     _drawSingleScoreHUD(ctx);   // on-screen score, Code Bullet style (top corners)
-    if (focus && focus.car) _drawAltimeter(ctx, focus.car, CANVAS_WIDTH / 2, 48);
+    // Center HUD meters: altimeter on top, speed under it. Whichever is on alone
+    // sits at the top-middle (y=48); when both are on, speed drops one line below.
+    if (focus && focus.car) {
+      var hudY = 48;
+      if (bpAltimeter) { _drawAltimeter(ctx, focus.car, CANVAS_WIDTH / 2, hudY); hudY += 32; }
+      if (bpSpeed)     { _drawSpeedometer(ctx, focus.car, CANVAS_WIDTH / 2, hudY); }
+    }
   }
 
   if (ghostPoses) {
@@ -1746,7 +1781,7 @@ document.getElementById("mode").onchange = function() {
 // Bug-probe controls
 document.getElementById("bp_invince").onchange = function() {
   bpInvincible = this.checked;
-  bpSetStatus(bpInvincible ? "Invincible ON — head-hit / fall-off won't kill you."
+  bpSetStatus(bpInvincible ? "Invincible ON — head-hit / fall-off / AI no-progress timeout won't kill any car."
                            : "Invincible OFF.");
 };
 document.getElementById("bp_zerog").onchange   = function() { bpSetZeroG(this.checked); };
@@ -1754,6 +1789,11 @@ document.getElementById("bp_altimeter").onchange = function() {
   bpAltimeter = this.checked;
   bpSetStatus(bpAltimeter ? "Altimeter ON — height above the ground shown on screen."
                           : "Altimeter OFF.");
+};
+document.getElementById("bp_speed").onchange = function() {
+  bpSpeed = this.checked;
+  bpSetStatus(bpSpeed ? "Speed meter ON — chassis velocity (m/s) shown on screen."
+                      : "Speed meter OFF.");
 };
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_flag").onclick     = bpFlag;
@@ -2138,7 +2178,7 @@ function _handleActionKey(e) {
   if (k === "escape") { document.getElementById("keybinds_panel").style.display = "none"; return; }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
   var map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", h: "bp_altimeter",
-              r: "reset_pos", t: "reset", p: "pause" };
+              v: "bp_speed", r: "reset_pos", t: "reset", p: "pause" };
   var id = map[k];
   if (!id) return;
   var el = document.getElementById(id);
