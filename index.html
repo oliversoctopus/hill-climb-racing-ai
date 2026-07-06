@@ -412,9 +412,12 @@ var bpInvincible = false;  // skip head-ground / fell-off death (bug probe)
 var bpAltimeter = false;   // show a live height-above-ground readout (cheat)
 var bpSpeed = false;       // show a live speed (velocity) readout (cheat, V)
 var bpFlight = false;      // flight/rocket mode — WASD/arrows fly the car (cheat, G)
-// Logical flight controls, fed by BOTH WASD and the arrow keys (W/↑ forward,
-// S/↓ backward, A/← rotate left, D/→ rotate right).
-var flightKeys = { fwd: false, back: false, rotL: false, rotR: false };
+// Logical flight controls, tracked per control-set so Human-vs-Human gives each
+// player their own rocket (WASD = left player, arrows = right player). Single-player
+// modes merge the two sets so either hand flies the lone car. Each: fwd/back thrust,
+// rotL/rotR spin (W/↑ forward, S/↓ backward, A/← left, D/→ right).
+var flightKeysWASD   = { fwd: false, back: false, rotL: false, rotR: false };
+var flightKeysArrows = { fwd: false, back: false, rotL: false, rotR: false };
 var FLIGHT_ACCEL_MIN = 5, FLIGHT_ACCEL_MAX = 120, FLIGHT_ACCEL_STEP = 5;
 var flightAccel = 25;      // thrust in m/s² along facing (scroll-wheel adjustable)
 var FLIGHT_ROT_RATE = 3.0; // chassis spin rate (rad/s) while rotate held
@@ -523,28 +526,41 @@ function bpApplyMotorOverride() {
 // on top of gravity; rotation drives the chassis angular velocity directly for crisp
 // control. The scroll wheel changes flightAccel (see the wheel handler). Called each
 // tick from runOneStep after the motor step, so it overrides normal driving.
-function applyFlight() {
-  if (!bpFlight) return;
-  var cars = _bpAllCars();
-  if (!cars.length) return;
-  var sign = flightKeys.fwd ? 1 : (flightKeys.back ? -1 : 0);
-  var spin = (flightKeys.rotL === flightKeys.rotR) ? 0 : (flightKeys.rotR ? 1 : -1);
-  for (var ci = 0; ci < cars.length; ci++) {
-    var c = cars[ci];
-    try { c.motorOff(); } catch (e) {}   // it's a rocket now, not a driven car
-    var cb = c.chassisBody;
-    if (sign !== 0) {
-      // Facing = chassis local +x in world space (the car drives right at angle 0).
-      var dir = cb.GetWorldVector(new Vec2(1, 0));
-      var bodies = _dynBodies(c);
-      for (var i = 0; i < bodies.length; i++) {
-        var b = bodies[i]; if (!b) continue;
-        var m = b.GetMass(); if (!(m > 0)) continue;   // static/frozen bodies: skip
-        b.ApplyForce(new Vec2(sign * flightAccel * m * dir.x,
-                              sign * flightAccel * m * dir.y), b.GetWorldCenter());
-      }
+// Rocket-fly one car from a flight-input set {fwd,back,rotL,rotR}.
+function _flyCar(c, input) {
+  try { c.motorOff(); } catch (e) {}   // it's a rocket now, not a driven car
+  var cb = c.chassisBody;
+  var sign = input.fwd ? 1 : (input.back ? -1 : 0);
+  var spin = (input.rotL === input.rotR) ? 0 : (input.rotR ? 1 : -1);
+  if (sign !== 0) {
+    // Facing = chassis local +x in world space (the car drives right at angle 0).
+    var dir = cb.GetWorldVector(new Vec2(1, 0));
+    var bodies = _dynBodies(c);
+    for (var i = 0; i < bodies.length; i++) {
+      var b = bodies[i]; if (!b) continue;
+      var m = b.GetMass(); if (!(m > 0)) continue;   // static/frozen bodies: skip
+      b.ApplyForce(new Vec2(sign * flightAccel * m * dir.x,
+                            sign * flightAccel * m * dir.y), b.GetWorldCenter());
     }
-    if (spin !== 0) { cb.SetAngularVelocity(spin * FLIGHT_ROT_RATE); cb.SetAwake(true); }
+  }
+  if (spin !== 0) { cb.SetAngularVelocity(spin * FLIGHT_ROT_RATE); cb.SetAwake(true); }
+}
+// OR-merge two control sets (single-player: either hand flies the lone car).
+function _mergeFlight(a, b) {
+  return { fwd: a.fwd || b.fwd, back: a.back || b.back,
+           rotL: a.rotL || b.rotL, rotR: a.rotR || b.rotR };
+}
+function applyFlight() {
+  if (!bpFlight || !players || !players.length) return;
+  // Human-vs-Human: each player flies with their OWN control set (WASD = left,
+  // arrows = right). Every other mode has one human, so merge both sets and apply
+  // to all cars (incl. the AI's) — the cheat drives whatever's on screen.
+  var merged = (mode === "hvh") ? null : _mergeFlight(flightKeysWASD, flightKeysArrows);
+  for (var pi = 0; pi < players.length; pi++) {
+    var p = players[pi]; if (!p.car) continue;
+    var input = merged
+      || (p.control === "arrows" ? flightKeysArrows : flightKeysWASD);
+    _flyCar(p.car, input);
   }
 }
 
@@ -2336,19 +2352,18 @@ function _handleGameKey(e, down) {
     if (!(e.target.id === "mode" && isDriveKey)) return;
     if (down) focusGame();
   }
-  // Driving state (humanKeys/humanKeysWASD) AND flight state (flightKeys) are fed
-  // from the same keys: driving reads left/right; flight reads forward/back/rotate.
-  // Both WASD and arrows map to flight so either hand works (↑/W fwd, ↓/S back,
-  // ←/A rotate left, →/D rotate right).
+  // Each key feeds BOTH its driving state (humanKeys/humanKeysWASD: left/right) and
+  // its flight state. WASD → flightKeysWASD, arrows → flightKeysArrows, so Human-vs-
+  // Human flies each player independently (↑/W fwd, ↓/S back, ←/A left, →/D right).
   switch (k) {
-    case "ArrowLeft":  humanKeys.left      = down; flightKeys.rotL = down; e.preventDefault(); break;
-    case "ArrowRight": humanKeys.right     = down; flightKeys.rotR = down; e.preventDefault(); break;
-    case "ArrowUp":                                flightKeys.fwd  = down; e.preventDefault(); break;
-    case "ArrowDown":                              flightKeys.back = down; e.preventDefault(); break;
-    case "a": humanKeysWASD.left  = down; flightKeys.rotL = down; e.preventDefault(); break;
-    case "s": humanKeysWASD.left  = down; flightKeys.back = down; e.preventDefault(); break;
-    case "d": humanKeysWASD.right = down; flightKeys.rotR = down; e.preventDefault(); break;
-    case "w": humanKeysWASD.right = down; flightKeys.fwd  = down; e.preventDefault(); break;
+    case "ArrowLeft":  humanKeys.left      = down; flightKeysArrows.rotL = down; e.preventDefault(); break;
+    case "ArrowRight": humanKeys.right     = down; flightKeysArrows.rotR = down; e.preventDefault(); break;
+    case "ArrowUp":                                flightKeysArrows.fwd  = down; e.preventDefault(); break;
+    case "ArrowDown":                              flightKeysArrows.back = down; e.preventDefault(); break;
+    case "a": humanKeysWASD.left  = down; flightKeysWASD.rotL = down; e.preventDefault(); break;
+    case "s": humanKeysWASD.left  = down; flightKeysWASD.back = down; e.preventDefault(); break;
+    case "d": humanKeysWASD.right = down; flightKeysWASD.rotR = down; e.preventDefault(); break;
+    case "w": humanKeysWASD.right = down; flightKeysWASD.fwd  = down; e.preventDefault(); break;
   }
 }
 // Single-key action shortcuts (fire once on keydown, never while typing in a field).
