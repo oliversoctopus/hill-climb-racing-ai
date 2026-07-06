@@ -1065,9 +1065,10 @@ function _drawScenery(ctx, viewWidth) {
     ctx.lineTo(topPts[0][0], CANVAS_HEIGHT);
     ctx.closePath();
     ctx.fill();
-    // Main green grass band. Width matches Code Bullet's Ground.show():
-    // strokeWeight(grassThickness * 2) = 5 * 2 = 10 (centered on the terrain line).
-    ctx.strokeStyle = "#006400"; ctx.lineWidth = 10;
+    // Main green grass band. Width + color match Code Bullet's Ground.show():
+    // stroke(0, 120, 0) = #007800, strokeWeight(grassThickness * 2) = 5 * 2 = 10
+    // (centered on the terrain line).
+    ctx.strokeStyle = "#007800"; ctx.lineWidth = 10;
     ctx.beginPath();
     ctx.moveTo(topPts[0][0], topPts[0][1]);
     for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
