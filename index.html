@@ -777,6 +777,14 @@ function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   _accumSec = 0;
   _lastWallMs = 0;
   bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars (all of them)
+  // Keep Zero-G in sync with its checkbox across rebuilds. The fresh world above has
+  // normal gravity (bpZeroG was reset to false), so if the user left the Zero-G cheat
+  // ticked, re-apply it to the new world. Otherwise the checkbox would read ON while
+  // gravity was actually restored, which is exactly the double-toggle (turn checkbox
+  // off, then on) the user had to do to re-enable it. bpSetZeroG recaptures the fresh
+  // world's real gravity on entry, so bpSavedGravity stays correct.
+  var _zg = document.getElementById("bp_zerog");
+  if (_zg && _zg.checked) bpSetZeroG(true);
 }
 
 // ---- Session terrains -------------------------------------------------------
@@ -1214,6 +1222,44 @@ function _drawSpeedometer(ctx, car, centerX, y) {
            centerX, y, "center", "#ffd27f", 20);
 }
 
+// Ghost-replay variants of the altimeter/speed cheats. A ghost is a recorded pose
+// stream (no live bodies), so there's no car to read GetPosition()/GetLinearVelocity()
+// from — altitude comes straight from the recorded chassis pose vs the ground below
+// it, and speed is derived by finite-differencing the chassis position between the
+// neighbouring recorded frames (SCALE'd meters; world y is DOWN so vertical = -vy).
+// The other physics-knob cheats (Zero-G, Float, motor, friction) genuinely can't
+// apply to a replay because there's no live simulation to perturb — only these two
+// readouts are meaningful, which is why only they are wired up here.
+function _ghostAltitudeMeters(pose) {
+  if (!pose || !ground || !ground.getPositions) return 0;
+  var g = ground.getPositions(pose.chassis.x, 1, 1);
+  return g[0] - pose.chassis.y;
+}
+function _ghostSpeedComponents(idx) {
+  if (!ghostPoses || ghostPoses.length < 2) return { h: 0, v: 0, total: 0 };
+  var i  = Math.max(0, Math.min(idx, ghostPoses.length - 1));
+  var i0 = Math.max(0, i - 1), i1 = Math.min(ghostPoses.length - 1, i + 1);
+  if (i1 === i0) return { h: 0, v: 0, total: 0 };
+  var a = ghostPoses[i0].chassis, b = ghostPoses[i1].chassis;
+  var dt = (i1 - i0) / FRAME_RATE;
+  var vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
+  return { h: vx, v: -vy, total: Math.sqrt(vx * vx + vy * vy) };
+}
+function _drawGhostMeters(ctx, pose, idx, centerX, topY) {
+  var y = topY;
+  if (bpAltimeter) {
+    _hudText(ctx, "⛰ Altitude " + _ghostAltitudeMeters(pose).toFixed(1) + " m",
+             centerX, y, "center", "#9fd4ff");
+    y += 32;
+  }
+  if (bpSpeed) {
+    var s = _ghostSpeedComponents(idx);
+    _hudText(ctx, "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
+                  "  Tot " + s.total.toFixed(1) + " m/s",
+             centerX, y, "center", "#ffd27f", 20);
+  }
+}
+
 function render() {
   var cv = document.getElementById("stage");
   var ctx = cv.getContext("2d");
@@ -1252,6 +1298,8 @@ function render() {
     // Live AI score, top-left, same as the other modes (the ghost is the AI's run).
     var gscore = Math.max(0, Math.floor((ghostPose.chassis.x * SCALE - SPAWN_X) / 10));
     _hudText(ctx, "AI Score: " + gscore, 24, 48, "left", AI_COLOR.outline);
+    // Center HUD cheats that still make sense on a replay: altimeter + speed.
+    _drawGhostMeters(ctx, ghostPose, ghostIdx, CANVAS_WIDTH / 2, 48);
   } else {
     for (var pi = 0; pi < players.length; pi++) {
       _drawCar(ctx, players[pi].car, players[pi].color, players[pi].isAI);
