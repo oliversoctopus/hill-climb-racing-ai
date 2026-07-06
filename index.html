@@ -61,6 +61,7 @@
     <tr><td><b>F</b></td><td>Float car up</td></tr>
     <tr><td><b>H</b></td><td>Altimeter (toggle height readout)</td></tr>
     <tr><td><b>V</b></td><td>Speed meter (toggle velocity readout)</td></tr>
+    <tr><td><b>G</b></td><td>Flight mode (rocket): WASD/arrows fly — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
     <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
     <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
     <tr><td><b>P</b></td><td>Pause / Resume</td></tr>
@@ -84,6 +85,7 @@
   <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_altimeter" title="Show a live height-above-ground readout (H)"> Altimeter</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_speed" title="Show a live speed (velocity) readout (V)"> Speed</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Rocket mode — WASD/arrows fly the car (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (G)"> Flight</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
 </div>
 <details id="advanced_panel" style="max-width:1100px; margin:6px auto;">
@@ -409,6 +411,13 @@ var bpSavedGravity = null;
 var bpInvincible = false;  // skip head-ground / fell-off death (bug probe)
 var bpAltimeter = false;   // show a live height-above-ground readout (cheat)
 var bpSpeed = false;       // show a live speed (velocity) readout (cheat, V)
+var bpFlight = false;      // flight/rocket mode — WASD/arrows fly the car (cheat, G)
+// Logical flight controls, fed by BOTH WASD and the arrow keys (W/↑ forward,
+// S/↓ backward, A/← rotate left, D/→ rotate right).
+var flightKeys = { fwd: false, back: false, rotL: false, rotR: false };
+var FLIGHT_ACCEL_MIN = 5, FLIGHT_ACCEL_MAX = 120, FLIGHT_ACCEL_STEP = 5;
+var flightAccel = 25;      // thrust in m/s² along facing (scroll-wheel adjustable)
+var FLIGHT_ROT_RATE = 3.0; // chassis spin rate (rad/s) while rotate held
 
 function _bpHumanPlayer() {
   if (typeof players === "undefined" || !players) return null;
@@ -504,6 +513,38 @@ function bpApplyMotorOverride() {
         try { j.SetMotorSpeed(j.GetMotorSpeed() * ss); } catch (e) {}
       }
     }
+  }
+}
+
+// Flight/rocket mode (cheat, G): turn every live car into a rocket ship steered by
+// WASD or the arrow keys — W/↑ and S/↓ thrust forward/backward along the chassis
+// facing, A/← and D/→ spin it. Thrust is a mass-proportional force on every body,
+// so the whole assembly accelerates uniformly at `flightAccel` m/s² (joints intact)
+// on top of gravity; rotation drives the chassis angular velocity directly for crisp
+// control. The scroll wheel changes flightAccel (see the wheel handler). Called each
+// tick from runOneStep after the motor step, so it overrides normal driving.
+function applyFlight() {
+  if (!bpFlight) return;
+  var cars = _bpAllCars();
+  if (!cars.length) return;
+  var sign = flightKeys.fwd ? 1 : (flightKeys.back ? -1 : 0);
+  var spin = (flightKeys.rotL === flightKeys.rotR) ? 0 : (flightKeys.rotR ? 1 : -1);
+  for (var ci = 0; ci < cars.length; ci++) {
+    var c = cars[ci];
+    try { c.motorOff(); } catch (e) {}   // it's a rocket now, not a driven car
+    var cb = c.chassisBody;
+    if (sign !== 0) {
+      // Facing = chassis local +x in world space (the car drives right at angle 0).
+      var dir = cb.GetWorldVector(new Vec2(1, 0));
+      var bodies = _dynBodies(c);
+      for (var i = 0; i < bodies.length; i++) {
+        var b = bodies[i]; if (!b) continue;
+        var m = b.GetMass(); if (!(m > 0)) continue;   // static/frozen bodies: skip
+        b.ApplyForce(new Vec2(sign * flightAccel * m * dir.x,
+                              sign * flightAccel * m * dir.y), b.GetWorldCenter());
+      }
+    }
+    if (spin !== 0) { cb.SetAngularVelocity(spin * FLIGHT_ROT_RATE); cb.SetAwake(true); }
   }
 }
 
@@ -893,6 +934,7 @@ async function runOneStep() {
   }
   if (replayActions !== null) replayIdx += 1;
   bpApplyMotorOverride();   // bug probe: re-apply scaled motor speed/torque before the step
+  applyFlight();            // cheat: WASD/arrow rocket thrust + rotation (overrides driving)
 
   world.Step(1.0 / FRAME_RATE, 10, 10);
   world.ClearForces();
@@ -1261,6 +1303,10 @@ var CHEAT_HUD = [
     line: function (t) { var s = t.speed();
       return "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
              "  Tot " + s.total.toFixed(1) + " m/s"; } },
+  // Flight thrust readout (no target needed): shows the current scroll-set accel.
+  { color: "#ff9d6e", size: 20,
+    on:   function () { return bpFlight; },
+    line: function () { return "🚀 Flight thrust " + flightAccel + " m/s²  (scroll to adjust)"; } },
 ];
 // Draw every enabled readout for `target`, stacked from topY down. Whichever
 // cheats are on pack upward (an enabled cheat alone sits at topY). Returns the y
@@ -1904,6 +1950,25 @@ document.getElementById("bp_speed").onchange = function() {
   bpSetStatus(bpSpeed ? "Speed meter ON — chassis velocity (m/s) shown on screen."
                       : "Speed meter OFF.");
 };
+document.getElementById("bp_flight").onchange = function() {
+  bpFlight = this.checked;
+  bpSetStatus(bpFlight
+    ? "Flight mode ON — WASD/arrows fly the car like a rocket (↑/W & ↓/S thrust, " +
+      "←/A & →/D rotate). Thrust " + flightAccel + " m/s²; scroll wheel to adjust. " +
+      "Tip: turn on Invincible to survive crashes."
+    : "Flight mode OFF.");
+};
+// Scroll wheel over the canvas changes flight thrust (up = faster, down = slower),
+// clamped to [MIN, MAX]. Only active while flight mode is on; passive:false so we
+// can preventDefault and stop the page from scrolling.
+document.getElementById("stage").addEventListener("wheel", function(e) {
+  if (!bpFlight) return;
+  e.preventDefault();
+  var step = (e.deltaY < 0 ? 1 : -1) * FLIGHT_ACCEL_STEP;
+  flightAccel = Math.max(FLIGHT_ACCEL_MIN, Math.min(FLIGHT_ACCEL_MAX, flightAccel + step));
+  bpSetStatus("Flight thrust " + flightAccel + " m/s²  (scroll up = faster, down = slower; " +
+              FLIGHT_ACCEL_MIN + "–" + FLIGHT_ACCEL_MAX + ")");
+}, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_flag").onclick     = bpFlag;
 document.getElementById("bp_download").onclick = bpDownload;
@@ -2271,11 +2336,19 @@ function _handleGameKey(e, down) {
     if (!(e.target.id === "mode" && isDriveKey)) return;
     if (down) focusGame();
   }
+  // Driving state (humanKeys/humanKeysWASD) AND flight state (flightKeys) are fed
+  // from the same keys: driving reads left/right; flight reads forward/back/rotate.
+  // Both WASD and arrows map to flight so either hand works (↑/W fwd, ↓/S back,
+  // ←/A rotate left, →/D rotate right).
   switch (k) {
-    case "ArrowLeft":  humanKeys.left      = down; e.preventDefault(); break;
-    case "ArrowRight": humanKeys.right     = down; e.preventDefault(); break;
-    case "a": case "s": humanKeysWASD.left  = down; e.preventDefault(); break;
-    case "d": case "w": humanKeysWASD.right = down; e.preventDefault(); break;
+    case "ArrowLeft":  humanKeys.left      = down; flightKeys.rotL = down; e.preventDefault(); break;
+    case "ArrowRight": humanKeys.right     = down; flightKeys.rotR = down; e.preventDefault(); break;
+    case "ArrowUp":                                flightKeys.fwd  = down; e.preventDefault(); break;
+    case "ArrowDown":                              flightKeys.back = down; e.preventDefault(); break;
+    case "a": humanKeysWASD.left  = down; flightKeys.rotL = down; e.preventDefault(); break;
+    case "s": humanKeysWASD.left  = down; flightKeys.back = down; e.preventDefault(); break;
+    case "d": humanKeysWASD.right = down; flightKeys.rotR = down; e.preventDefault(); break;
+    case "w": humanKeysWASD.right = down; flightKeys.fwd  = down; e.preventDefault(); break;
   }
 }
 // Single-key action shortcuts (fire once on keydown, never while typing in a field).
@@ -2287,7 +2360,7 @@ function _handleActionKey(e) {
   if (k === "escape") { document.getElementById("keybinds_panel").style.display = "none"; return; }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
   var map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", h: "bp_altimeter",
-              v: "bp_speed", r: "reset_pos", t: "reset", p: "pause" };
+              v: "bp_speed", g: "bp_flight", r: "reset_pos", t: "reset", p: "pause" };
   var id = map[k];
   if (!id) return;
   var el = document.getElementById(id);
