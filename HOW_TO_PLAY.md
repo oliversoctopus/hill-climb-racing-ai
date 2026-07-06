@@ -127,9 +127,10 @@ are unaffected (no retrain implied).
   Pressing **Zero-G** again restores gravity.
 - **Altimeter (H) / Speed meter (V):** on-screen readouts for the focused car —
   height above the ground (m) and speed as **H**orizontal / **V**ertical / **Tot**al
-  (m/s; vertical is positive upward). They sit top-center; when both are on, altitude
-  is on top and speed just below. In Human-vs-Human split mode each screen shows its
-  own player's meters.
+  (m/s; vertical is positive upward). Speed is the car's whole-vehicle
+  center-of-mass velocity, so spinning or flipping doesn't inflate it. They sit
+  top-center; when both are on, altitude is on top and speed just below. In
+  Human-vs-Human split mode each screen shows its own player's meters.
 - **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
 - **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
   the active physics knobs) for offline analysis.

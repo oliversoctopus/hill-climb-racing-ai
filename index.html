@@ -1155,14 +1155,39 @@ function _drawAltimeter(ctx, car, centerX, y) {
   _hudText(ctx, "⛰ Altitude " + m.toFixed(1) + " m", centerX, y, "center", "#9fd4ff");
 }
 
-// Speed meter (cheat): chassis velocity components in m/s. Box2D velocities are
-// already in world units (m/s; SCALE = 30 px/m), so no conversion needed. x>0 is
-// forward/right; world y points DOWN, so vertical is reported as -vy (positive =
-// upward) which reads more naturally than "down is positive".
+// Speed meter (cheat): the WHOLE-VEHICLE center-of-mass velocity in m/s — the
+// mass-weighted mean of every body's own CoM velocity (chassis + wheels/rims +
+// person). Box2D's GetLinearVelocity is already each body's CoM velocity, but the
+// chassis CoM orbits the vehicle CoM while the car spins, so a chassis-only reading
+// wobbles with rotation; the combined CoM velocity is the true translational speed
+// (internal spin contributes zero net momentum, so it cancels). Velocities are
+// already world units (m/s; SCALE = 30 px/m). x>0 is forward/right; world y points
+// DOWN, so vertical is reported as -vy (positive = upward).
 function _speedComponents(car) {
   if (!car) return { h: 0, v: 0, total: 0 };
-  var v = car.chassisBody.GetLinearVelocity();
-  return { h: v.x, v: -v.y, total: Math.sqrt(v.x * v.x + v.y * v.y) };
+  var bodies = [];
+  if (car.chassisBody) bodies.push(car.chassisBody);
+  if (car.wheels) for (var wi = 0; wi < car.wheels.length; wi++) {
+    var w = car.wheels[wi]; if (!w) continue;
+    if (w.body) bodies.push(w.body);
+    if (w.rimBody) bodies.push(w.rimBody);
+  }
+  if (car.person) {
+    if (car.person.torso && car.person.torso.body) bodies.push(car.person.torso.body);
+    if (car.person.head && car.person.head.body) bodies.push(car.person.head.body);
+  }
+  var mx = 0, my = 0, mtot = 0;
+  for (var i = 0; i < bodies.length; i++) {
+    var m = bodies[i].GetMass(); if (!(m > 0)) continue;   // static/frozen bodies have mass 0
+    var bv = bodies[i].GetLinearVelocity();
+    mx += m * bv.x; my += m * bv.y; mtot += m;
+  }
+  if (mtot <= 0) {   // dead/frozen car — fall back to the chassis body
+    var cv = car.chassisBody.GetLinearVelocity();
+    return { h: cv.x, v: -cv.y, total: Math.sqrt(cv.x * cv.x + cv.y * cv.y) };
+  }
+  var vx = mx / mtot, vy = my / mtot;
+  return { h: vx, v: -vy, total: Math.sqrt(vx * vx + vy * vy) };
 }
 function _drawSpeedometer(ctx, car, centerX, y) {
   if (!bpSpeed) return;
