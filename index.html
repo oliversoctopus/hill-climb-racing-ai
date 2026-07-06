@@ -1174,12 +1174,6 @@ function _altitudeMeters(car) {
   var g = ground.getPositions(p.x, 1, 1);
   return g[0] - p.y;
 }
-function _drawAltimeter(ctx, car, centerX, y) {
-  if (!bpAltimeter) return;
-  var m = _altitudeMeters(car);
-  _hudText(ctx, "⛰ Altitude " + m.toFixed(1) + " m", centerX, y, "center", "#9fd4ff");
-}
-
 // Speed meter (cheat): the WHOLE-VEHICLE center-of-mass velocity in m/s — the
 // mass-weighted mean of every body's own CoM velocity (chassis + wheels/rims +
 // person). Box2D's GetLinearVelocity is already each body's CoM velocity, but the
@@ -1214,22 +1208,12 @@ function _speedComponents(car) {
   var vx = mx / mtot, vy = my / mtot;
   return { h: vx, v: -vy, total: Math.sqrt(vx * vx + vy * vy) };
 }
-function _drawSpeedometer(ctx, car, centerX, y) {
-  if (!bpSpeed) return;
-  var s = _speedComponents(car);
-  _hudText(ctx, "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
-                "  Tot " + s.total.toFixed(1) + " m/s",
-           centerX, y, "center", "#ffd27f", 20);
-}
 
-// Ghost-replay variants of the altimeter/speed cheats. A ghost is a recorded pose
+// Ghost-replay data sources for the readout cheats. A ghost is a recorded pose
 // stream (no live bodies), so there's no car to read GetPosition()/GetLinearVelocity()
 // from — altitude comes straight from the recorded chassis pose vs the ground below
 // it, and speed is derived by finite-differencing the chassis position between the
 // neighbouring recorded frames (SCALE'd meters; world y is DOWN so vertical = -vy).
-// The other physics-knob cheats (Zero-G, Float, motor, friction) genuinely can't
-// apply to a replay because there's no live simulation to perturb — only these two
-// readouts are meaningful, which is why only they are wired up here.
 function _ghostAltitudeMeters(pose) {
   if (!pose || !ground || !ground.getPositions) return 0;
   var g = ground.getPositions(pose.chassis.x, 1, 1);
@@ -1245,19 +1229,52 @@ function _ghostSpeedComponents(idx) {
   var vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
   return { h: vx, v: -vy, total: Math.sqrt(vx * vx + vy * vy) };
 }
-function _drawGhostMeters(ctx, pose, idx, centerX, topY) {
+
+// ---- Unified on-screen cheat HUD -------------------------------------------
+// One registry for every centre-screen "readout" cheat (altimeter, speed, …) so
+// EVERY render path — single screen, split-screen Human-vs-Human, and ghost
+// replay — draws them identically. Each render path only has to build a "cheat
+// target" (a live car OR a replay frame) and call drawCheatHUD once.
+//
+// To add a new readout cheat: add its global flag + checkbox/key, give the target
+// abstraction whatever accessor it needs (below), and add ONE entry to CHEAT_HUD.
+// It then appears in all modes automatically — no per-mode wiring.
+//
+// A cheat target hides whether we're measuring live Box2D bodies or a recorded
+// pose; both expose the same accessors the readouts consume.
+function cheatTargetFromCar(car) {
+  return { altitude: function () { return _altitudeMeters(car); },
+           speed:    function () { return _speedComponents(car); } };
+}
+function cheatTargetFromGhost(pose, idx) {
+  return { altitude: function () { return _ghostAltitudeMeters(pose); },
+           speed:    function () { return _ghostSpeedComponents(idx); } };
+}
+// Registry entries render top-to-bottom in this order. `on` reads the toggle flag;
+// `line` turns a target into the display string; `color`/`size` style the text.
+var CHEAT_HUD = [
+  { color: "#9fd4ff",
+    on:   function () { return bpAltimeter; },
+    line: function (t) { return "⛰ Altitude " + t.altitude().toFixed(1) + " m"; } },
+  { color: "#ffd27f", size: 20,
+    on:   function () { return bpSpeed; },
+    line: function (t) { var s = t.speed();
+      return "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
+             "  Tot " + s.total.toFixed(1) + " m/s"; } },
+];
+// Draw every enabled readout for `target`, stacked from topY down. Whichever
+// cheats are on pack upward (an enabled cheat alone sits at topY). Returns the y
+// after the last line so callers can keep laying out below it if needed.
+function drawCheatHUD(ctx, target, centerX, topY) {
+  if (!target) return topY;
   var y = topY;
-  if (bpAltimeter) {
-    _hudText(ctx, "⛰ Altitude " + _ghostAltitudeMeters(pose).toFixed(1) + " m",
-             centerX, y, "center", "#9fd4ff");
+  for (var i = 0; i < CHEAT_HUD.length; i++) {
+    var c = CHEAT_HUD[i];
+    if (!c.on()) continue;
+    _hudText(ctx, c.line(target), centerX, y, "center", c.color, c.size);
     y += 32;
   }
-  if (bpSpeed) {
-    var s = _ghostSpeedComponents(idx);
-    _hudText(ctx, "🚗 H " + s.h.toFixed(1) + "  V " + s.v.toFixed(1) +
-                  "  Tot " + s.total.toFixed(1) + " m/s",
-             centerX, y, "center", "#ffd27f", 20);
-  }
+  return y;
 }
 
 function render() {
@@ -1298,20 +1315,15 @@ function render() {
     // Live AI score, top-left, same as the other modes (the ghost is the AI's run).
     var gscore = Math.max(0, Math.floor((ghostPose.chassis.x * SCALE - SPAWN_X) / 10));
     _hudText(ctx, "AI Score: " + gscore, 24, 48, "left", AI_COLOR.outline);
-    // Center HUD cheats that still make sense on a replay: altimeter + speed.
-    _drawGhostMeters(ctx, ghostPose, ghostIdx, CANVAS_WIDTH / 2, 48);
+    // Center readout cheats (altimeter/speed) — same HUD as every other mode.
+    drawCheatHUD(ctx, cheatTargetFromGhost(ghostPose, ghostIdx), CANVAS_WIDTH / 2, 48);
   } else {
     for (var pi = 0; pi < players.length; pi++) {
       _drawCar(ctx, players[pi].car, players[pi].color, players[pi].isAI);
     }
     _drawSingleScoreHUD(ctx);   // on-screen score, Code Bullet style (top corners)
-    // Center HUD meters: altimeter on top, speed under it. Whichever is on alone
-    // sits at the top-middle (y=48); when both are on, speed drops one line below.
-    if (focus && focus.car) {
-      var hudY = 48;
-      if (bpAltimeter) { _drawAltimeter(ctx, focus.car, CANVAS_WIDTH / 2, hudY); hudY += 32; }
-      if (bpSpeed)     { _drawSpeedometer(ctx, focus.car, CANVAS_WIDTH / 2, hudY); }
-    }
+    // Center readout cheats for the focused car (altimeter/speed), stacked at y=48.
+    if (focus && focus.car) drawCheatHUD(ctx, cheatTargetFromCar(focus.car), CANVAS_WIDTH / 2, 48);
   }
 
   if (ghostPoses) {
@@ -1376,11 +1388,9 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
   _hudText(ctx, ownName + " — Score " + scoreOf(ownP), 24, 48, "left",  ownColor.outline);
   _hudText(ctx, oppName + " — Score " + scoreOf(oppP), viewWidth - 24, 48, "right", oppColor.outline);
-  // Center meters for THIS player's car, below the score row: altimeter on top,
-  // speed under it (same stacking rule as the single-screen modes).
-  var hudY = 88;
-  if (bpAltimeter) { _drawAltimeter(ctx, ownP.car, viewWidth / 2, hudY); hudY += 32; }
-  if (bpSpeed)     { _drawSpeedometer(ctx, ownP.car, viewWidth / 2, hudY); }
+  // Center readout cheats for THIS player's car, below the score row — same HUD
+  // as every other mode, just anchored a line lower to clear the split score row.
+  drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 88);
 
   // A player who crossed the finish (beatTick) shows BEAT THE GAME — even after they
   // then fly off into the void and die, that's still a win, so beatTick wins over dead.
