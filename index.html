@@ -1073,11 +1073,25 @@ function _drawScenery(ctx, viewWidth) {
     ctx.moveTo(topPts[0][0], topPts[0][1]);
     for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
     ctx.stroke();
-    ctx.strokeStyle = "#008c00"; ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(topPts[0][0], topPts[0][1] - 4);
-    for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1] - 4);
-    ctx.stroke();
+    // Four thin (weight-3) detail lines, matching Code Bullet's Ground.show():
+    // two olive lines below the terrain line (the grass→dirt transition) and two
+    // bright-green highlights above it. Drawn in CB's order/offsets so the later,
+    // brighter lines sit on top.
+    var detail = [
+      ["#423c00", 9],   // stroke(66,60,0)  dark olive
+      ["#2c5a00", 6],   // stroke(44,90,0)  olive-green
+      ["#008c00", -5],  // stroke(0,140,0)  bright green
+      ["#008200", -3],  // stroke(0,130,0)  green
+    ];
+    ctx.lineWidth = 3;
+    for (var d = 0; d < detail.length; d++) {
+      ctx.strokeStyle = detail[d][0];
+      var off = detail[d][1];
+      ctx.beginPath();
+      ctx.moveTo(topPts[0][0], topPts[0][1] + off);
+      for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1] + off);
+      ctx.stroke();
+    }
   }
 
   // Grass sprites (Ground.js show()). Each vertex has 2 grass slots:
