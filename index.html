@@ -1241,17 +1241,12 @@ function _altitudeMeters(car) {
   var g = ground.getPositions(p.x, 1, 1);
   return g[0] - p.y;
 }
-// Speed meter (cheat): the WHOLE-VEHICLE center-of-mass velocity in m/s — the
-// mass-weighted mean of every body's own CoM velocity (chassis + wheels/rims +
-// person). Box2D's GetLinearVelocity is already each body's CoM velocity, but the
-// chassis CoM orbits the vehicle CoM while the car spins, so a chassis-only reading
-// wobbles with rotation; the combined CoM velocity is the true translational speed
-// (internal spin contributes zero net momentum, so it cancels). Velocities are
-// already world units (m/s; SCALE = 30 px/m). x>0 is forward/right; world y points
-// DOWN, so vertical is reported as -vy (positive = upward).
-function _speedComponents(car) {
-  if (!car) return { h: 0, v: 0, total: 0 };
+// Every dynamic body that makes up the vehicle (chassis + both wheels/rims +
+// person). Shared by the speed meter and the CoM helper so they always weigh the
+// SAME body set — the whole-vehicle center of mass, not just the chassis.
+function _vehicleBodies(car) {
   var bodies = [];
+  if (!car) return bodies;
   if (car.chassisBody) bodies.push(car.chassisBody);
   if (car.wheels) for (var wi = 0; wi < car.wheels.length; wi++) {
     var w = car.wheels[wi]; if (!w) continue;
@@ -1262,6 +1257,32 @@ function _speedComponents(car) {
     if (car.person.torso && car.person.torso.body) bodies.push(car.person.torso.body);
     if (car.person.head && car.person.head.body) bodies.push(car.person.head.body);
   }
+  return bodies;
+}
+// Whole-vehicle center of mass in world meters (mass-weighted mean of every body's
+// own CoM). This is a fixed point in the vehicle frame, so unlike the chassis origin
+// it does NOT orbit/wobble as the car spins — the right anchor for the readouts.
+function _vehicleCoM(car) {
+  var bodies = _vehicleBodies(car), mx = 0, my = 0, mtot = 0;
+  for (var i = 0; i < bodies.length; i++) {
+    var m = bodies[i].GetMass(); if (!(m > 0)) continue;
+    var c = bodies[i].GetWorldCenter();
+    mx += m * c.x; my += m * c.y; mtot += m;
+  }
+  if (mtot <= 0) { var p = car.chassisBody.GetPosition(); return { x: p.x, y: p.y }; }
+  return { x: mx / mtot, y: my / mtot };
+}
+// Speed meter (cheat): the WHOLE-VEHICLE center-of-mass velocity in m/s — the
+// mass-weighted mean of every body's own CoM velocity (chassis + wheels/rims +
+// person). Box2D's GetLinearVelocity is already each body's CoM velocity, but the
+// chassis CoM orbits the vehicle CoM while the car spins, so a chassis-only reading
+// wobbles with rotation; the combined CoM velocity is the true translational speed
+// (internal spin contributes zero net momentum, so it cancels). Velocities are
+// already world units (m/s; SCALE = 30 px/m). x>0 is forward/right; world y points
+// DOWN, so vertical is reported as -vy (positive = upward).
+function _speedComponents(car) {
+  if (!car) return { h: 0, v: 0, total: 0 };
+  var bodies = _vehicleBodies(car);
   var mx = 0, my = 0, mtot = 0;
   for (var i = 0; i < bodies.length; i++) {
     var m = bodies[i].GetMass(); if (!(m > 0)) continue;   // static/frozen bodies have mass 0
@@ -1278,20 +1299,25 @@ function _speedComponents(car) {
 
 // Ghost-replay data sources for the readout cheats. A ghost is a recorded pose
 // stream (no live bodies), so there's no car to read GetPosition()/GetLinearVelocity()
-// from — altitude comes straight from the recorded chassis pose vs the ground below
-// it, and speed is derived by finite-differencing the chassis position between the
-// neighbouring recorded frames (SCALE'd meters; world y is DOWN so vertical = -vy).
+// from. Both readouts anchor on the recorded WHOLE-VEHICLE center of mass (pose.com),
+// NOT the chassis origin, so they don't wobble when the car spins — matching the live
+// speed meter. Altitude = ground below the CoM; speed = finite-difference of the CoM
+// across neighbouring frames (SCALE'd meters; world y is DOWN so vertical = -vy).
+// Older poses without a `com` fall back to the chassis point.
+function _ghostRef(pose) { return (pose && pose.com) ? pose.com : (pose ? pose.chassis : null); }
 function _ghostAltitudeMeters(pose) {
-  if (!pose || !ground || !ground.getPositions) return 0;
-  var g = ground.getPositions(pose.chassis.x, 1, 1);
-  return g[0] - pose.chassis.y;
+  var r = _ghostRef(pose);
+  if (!r || !ground || !ground.getPositions) return 0;
+  var g = ground.getPositions(r.x, 1, 1);
+  return g[0] - r.y;
 }
 function _ghostSpeedComponents(idx) {
   if (!ghostPoses || ghostPoses.length < 2) return { h: 0, v: 0, total: 0 };
   var i  = Math.max(0, Math.min(idx, ghostPoses.length - 1));
   var i0 = Math.max(0, i - 1), i1 = Math.min(ghostPoses.length - 1, i + 1);
   if (i1 === i0) return { h: 0, v: 0, total: 0 };
-  var a = ghostPoses[i0].chassis, b = ghostPoses[i1].chassis;
+  var a = _ghostRef(ghostPoses[i0]), b = _ghostRef(ghostPoses[i1]);
+  if (!a || !b) return { h: 0, v: 0, total: 0 };
   var dt = (i1 - i0) / FRAME_RATE;
   var vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
   return { h: vx, v: -vy, total: Math.sqrt(vx * vx + vy * vy) };
@@ -2125,6 +2151,7 @@ function capturePose(car) {
   return { chassis: wp(car.chassisBody),
            wheels: [wp(car.wheels[0].body), wp(car.wheels[1].body)],
            torso: wp(car.person.torso.body), head: wp(car.person.head.body),
+           com: _vehicleCoM(car),   // whole-vehicle CoM so the replay readouts don't wobble
            dead: !!car.player.kindaDead };
 }
 // Build a dedicated search world (clone of the given terrain) with ONE AI car.
