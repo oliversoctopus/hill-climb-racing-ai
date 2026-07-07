@@ -421,8 +421,11 @@ var flightKeysArrows = { fwd: false, back: false, rotL: false, rotR: false };
 var FLIGHT_ACCEL_MIN = 5, FLIGHT_ACCEL_MAX = 120, FLIGHT_ACCEL_STEP = 5;
 var flightAccel = 20;      // thrust in m/s² along facing (scroll-wheel adjustable)
 var FLIGHT_ROT_RATE = 1.6; // chassis spin rate (rad/s) while rotate held
-var FLIGHT_ROT_DAMP = 0.80; // per-tick angular "air resistance" when NOT turning:
-                            // bleeds off residual spin fast so it stops where you let go
+var FLIGHT_ROT_DAMP = 0.88; // per-tick angular "air resistance" when NOT turning:
+                            // bleeds off residual spin so it stops near where you let go
+var FLIGHT_LIN_DAMP = 0.99; // per-tick linear air resistance: a very light drag so
+                            // thrust settles at a terminal speed instead of forever
+                            // accelerating (no teleporting across the whole map)
 
 function _bpHumanPlayer() {
   if (typeof players === "undefined" || !players) return null;
@@ -534,16 +537,19 @@ function _flyCar(c, input) {
   var cb = c.chassisBody;
   var sign = input.fwd ? 1 : (input.back ? -1 : 0);
   var spin = (input.rotL === input.rotR) ? 0 : (input.rotR ? 1 : -1);
-  if (sign !== 0) {
-    // Facing = chassis local +x in world space (the car drives right at angle 0).
-    var dir = cb.GetWorldVector(new Vec2(1, 0));
-    var bodies = _dynBodies(c);
-    for (var i = 0; i < bodies.length; i++) {
-      var b = bodies[i]; if (!b) continue;
-      var m = b.GetMass(); if (!(m > 0)) continue;   // static/frozen bodies: skip
+  // Facing = chassis local +x in world space (the car drives right at angle 0).
+  var dir = cb.GetWorldVector(new Vec2(1, 0));
+  var bodies = _dynBodies(c);
+  for (var i = 0; i < bodies.length; i++) {
+    var b = bodies[i]; if (!b) continue;
+    var m = b.GetMass(); if (!(m > 0)) continue;   // static/frozen bodies: skip
+    if (sign !== 0)
       b.ApplyForce(new Vec2(sign * flightAccel * m * dir.x,
                             sign * flightAccel * m * dir.y), b.GetWorldCenter());
-    }
+    // Very light linear air resistance (applied whether thrusting or coasting) so
+    // speed converges to a terminal value instead of climbing without bound.
+    var v = b.GetLinearVelocity();
+    b.SetLinearVelocity(new Vec2(v.x * FLIGHT_LIN_DAMP, v.y * FLIGHT_LIN_DAMP));
   }
   if (spin !== 0) { cb.SetAngularVelocity(spin * FLIGHT_ROT_RATE); cb.SetAwake(true); }
   else { cb.SetAngularVelocity(cb.GetAngularVelocity() * FLIGHT_ROT_DAMP); }  // air resistance
