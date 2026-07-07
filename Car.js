@@ -110,13 +110,17 @@ class Car {
     var revJointDef = new b2RevoluteJointDef();
     var jointPos = new Vec2(x / SCALE, y / SCALE);
     revJointDef.Initialize(this.person.torso.body, this.chassisBody, jointPos);
-    // Permissive angular limit: a distance joint only fixes the head/torso DISTANCE,
-    // not which side it sits on, so a hard impact could kick the driver into a second
-    // stable equilibrium hanging 180deg below the car (and never climb back out). A
-    // +/-90deg limit still allows a big natural lean but makes the full flip impossible.
+    // Angular limit: a distance joint only fixes the torso DISTANCE, not which side it
+    // sits on, so a hard impact could push the driver into a second stable equilibrium
+    // hanging 180deg below the car (and never climb back out). The limit must sit INSIDE
+    // the upright basin of attraction, or the ragdoll just rests against the wall in the
+    // flip basin (what +/-90 did). The basin is ASYMMETRIC (rest is tilted ~-19.7deg,
+    // since the distance-joint anchor is offset forward): measured edges are jointAngle
+    // -71.6deg (torso tipping FORWARD) and +105.5deg (tipping BACK). We take a 1deg
+    // margin inside each -> [-70.6deg, +104.5deg]. See PROJECT_STATUS for the measurement.
     revJointDef.enableLimit = true;
-    revJointDef.lowerAngle = -Math.PI / 2;
-    revJointDef.upperAngle = Math.PI / 2;
+    revJointDef.lowerAngle = -70.6 * Math.PI / 180;   // forward edge -71.6deg, 1deg margin
+    revJointDef.upperAngle = 104.5 * Math.PI / 180;   // back edge +105.5deg, 1deg margin
     this.revJoint = this.world.CreateJoint(revJointDef);
 
     var distJointDef = new b2DistanceJointDef();

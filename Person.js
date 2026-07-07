@@ -12,10 +12,8 @@ class Person {
     var jointPos = new Vec2(x / SCALE, (y - personHeight) / SCALE);
 
     revJointDef.Initialize(this.head.body, this.torso.body, jointPos);
-    // Permissive neck limit (+/-75deg) so the head can't spin fully around the torso.
-    revJointDef.enableLimit = true;
-    revJointDef.lowerAngle = -Math.PI / 2.4;
-    revJointDef.upperAngle = Math.PI / 2.4;
+    // No neck limit: the head-to-torso joint doesn't exhibit the 180deg flip in practice
+    // (only torso-to-chassis does, limited in Car.js). Add one here if that ever changes.
     this.headJoint = this.world.CreateJoint(revJointDef);
 
 
