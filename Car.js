@@ -110,6 +110,13 @@ class Car {
     var revJointDef = new b2RevoluteJointDef();
     var jointPos = new Vec2(x / SCALE, y / SCALE);
     revJointDef.Initialize(this.person.torso.body, this.chassisBody, jointPos);
+    // Permissive angular limit: a distance joint only fixes the head/torso DISTANCE,
+    // not which side it sits on, so a hard impact could kick the driver into a second
+    // stable equilibrium hanging 180deg below the car (and never climb back out). A
+    // +/-90deg limit still allows a big natural lean but makes the full flip impossible.
+    revJointDef.enableLimit = true;
+    revJointDef.lowerAngle = -Math.PI / 2;
+    revJointDef.upperAngle = Math.PI / 2;
     this.revJoint = this.world.CreateJoint(revJointDef);
 
     var distJointDef = new b2DistanceJointDef();
