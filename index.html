@@ -1123,14 +1123,18 @@ function _drawCarFromPose(ctx, pose, color, d) {
 // focus car sits at screen-x `anchorX` and stays inside a vertical screen band.
 // Shared by single-view render and each half of the split screen.
 function _followCamera(cam, focusX, focusYworld, anchorX) {
-  var CAM_LEFT_MARGIN = 80;   // px: keep the focus at least this far from the left edge
-  var target = focusX - anchorX;
+  var CAM_TRIGGER_MARGIN = 80;   // px from the left edge; once the focus reaches this
+                                 // (reversing / flying backwards) the camera catches it
+  var target = focusX - anchorX; // normal offset: the focus sits anchorX px from the left
   if (!bpZeroG) {
-    // Normal play hides the pre-start area (floor the scroll at 0). But if the focus
-    // reverses far enough to reach the left edge of the screen — e.g. flown backwards
-    // with the Flight/Rocket cheat — follow it left so the person stays on screen.
-    var backstop = focusX - CAM_LEFT_MARGIN;    // lowest panX that still shows the focus
-    target = (backstop < 0) ? backstop : Math.max(0, target);
+    // Normal play floors the scroll at 0 so the pre-start area stays hidden and the
+    // focus is free to drift left across the screen. Once it reaches the trigger margin
+    // (80 px from the edge), catch it and smoothly (via the easing below) pan back to
+    // the FULL anchorX margin, holding it there — latched (panX < 0) until it returns
+    // to spawn, at which point the normal floor takes over again.
+    var flooredTarget = Math.max(0, target);
+    var triggered = (cam.panX < 0) || (focusX - cam.panX < CAM_TRIGGER_MARGIN);
+    target = triggered ? target : flooredTarget;
   }
   if (Math.abs(target - cam.panX) > 400) cam.panX = target;   // snap on big jumps
   else cam.panX += (target - cam.panX) * 0.25;
