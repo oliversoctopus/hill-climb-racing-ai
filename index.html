@@ -419,8 +419,10 @@ var bpFlight = false;      // flight/rocket mode — WASD/arrows fly the car (ch
 var flightKeysWASD   = { fwd: false, back: false, rotL: false, rotR: false };
 var flightKeysArrows = { fwd: false, back: false, rotL: false, rotR: false };
 var FLIGHT_ACCEL_MIN = 5, FLIGHT_ACCEL_MAX = 120, FLIGHT_ACCEL_STEP = 5;
-var flightAccel = 25;      // thrust in m/s² along facing (scroll-wheel adjustable)
-var FLIGHT_ROT_RATE = 3.0; // chassis spin rate (rad/s) while rotate held
+var flightAccel = 20;      // thrust in m/s² along facing (scroll-wheel adjustable)
+var FLIGHT_ROT_RATE = 1.6; // chassis spin rate (rad/s) while rotate held
+var FLIGHT_ROT_DAMP = 0.80; // per-tick angular "air resistance" when NOT turning:
+                            // bleeds off residual spin fast so it stops where you let go
 
 function _bpHumanPlayer() {
   if (typeof players === "undefined" || !players) return null;
@@ -544,6 +546,7 @@ function _flyCar(c, input) {
     }
   }
   if (spin !== 0) { cb.SetAngularVelocity(spin * FLIGHT_ROT_RATE); cb.SetAwake(true); }
+  else { cb.SetAngularVelocity(cb.GetAngularVelocity() * FLIGHT_ROT_DAMP); }  // air resistance
 }
 // OR-merge two control sets (single-player: either hand flies the lone car).
 function _mergeFlight(a, b) {
