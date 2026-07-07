@@ -1123,8 +1123,15 @@ function _drawCarFromPose(ctx, pose, color, d) {
 // focus car sits at screen-x `anchorX` and stays inside a vertical screen band.
 // Shared by single-view render and each half of the split screen.
 function _followCamera(cam, focusX, focusYworld, anchorX) {
+  var CAM_LEFT_MARGIN = 80;   // px: keep the focus at least this far from the left edge
   var target = focusX - anchorX;
-  if (!bpZeroG) target = Math.max(0, target);   // don't scroll before the start in normal play
+  if (!bpZeroG) {
+    // Normal play hides the pre-start area (floor the scroll at 0). But if the focus
+    // reverses far enough to reach the left edge of the screen — e.g. flown backwards
+    // with the Flight/Rocket cheat — follow it left so the person stays on screen.
+    var backstop = focusX - CAM_LEFT_MARGIN;    // lowest panX that still shows the focus
+    target = (backstop < 0) ? backstop : Math.max(0, target);
+  }
   if (Math.abs(target - cam.panX) > 400) cam.panX = target;   // snap on big jumps
   else cam.panX += (target - cam.panX) * 0.25;
   // Vertical follow: keep the focus car inside a screen band. Stays ~0 in normal
