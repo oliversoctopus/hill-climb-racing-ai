@@ -1536,9 +1536,10 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
   _hudText(ctx, ownName + " — Score " + scoreOf(ownP), 24, 48, "left",  ownColor.outline);
   _hudText(ctx, oppName + " — Score " + scoreOf(oppP), viewWidth - 24, 48, "right", oppColor.outline);
-  // Center readout cheats for THIS player's car, below the score row — same HUD
-  // as every other mode, just anchored a line lower to clear the split score row.
-  drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 88);
+  // Center readout cheats for THIS player's car — top-center at y=48, identical to
+  // every other mode. The score row is left/right-aligned, so the center readouts
+  // clear it without needing to sit lower.
+  drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 48);
 
   // A player who crossed the finish (beatTick) shows BEAT THE GAME — even after they
   // then fly off into the void and die, that's still a win, so beatTick wins over dead.
