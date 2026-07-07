@@ -420,8 +420,8 @@ var flightKeysWASD   = { fwd: false, back: false, rotL: false, rotR: false };
 var flightKeysArrows = { fwd: false, back: false, rotL: false, rotR: false };
 var FLIGHT_ACCEL_MIN = 5, FLIGHT_ACCEL_MAX = 120, FLIGHT_ACCEL_STEP = 5;
 var flightAccel = 20;      // thrust in m/s² along facing (scroll-wheel adjustable)
-var FLIGHT_ROT_RATE = 1.6; // chassis spin rate (rad/s) while rotate held
-var FLIGHT_ROT_DAMP = 0.88; // per-tick angular "air resistance" when NOT turning:
+var FLIGHT_ROT_RATE = 2.0; // chassis spin rate (rad/s) while rotate held
+var FLIGHT_ROT_DAMP = 0.90; // per-tick angular "air resistance" when NOT turning:
                             // bleeds off residual spin so it stops near where you let go
 var FLIGHT_LIN_DAMP = 0.99; // per-tick linear air resistance: a very light drag so
                             // thrust settles at a terminal speed instead of forever
