@@ -117,7 +117,7 @@
 </div>
 </details>
 <div id="bestofx_panel" style="display:none; text-align:center; margin:8px; color:#ddd;">
-  <label>Max attempts (X): <input id="bestofx_n" type="number" value="15" min="1" max="200" style="width:60px;" title="Stops early once the map is solved. On the deployed model, completion vs X: 10->70%, 15->79%, 20->82% (chaos caps it ~82%)."></label>
+  <label>Max attempts (X): <input id="bestofx_n" type="number" value="15" min="1" max="200" style="width:60px;" title="Stops early once a map is solved (an attempt reaches the last vertex / true end). More attempts solve more maps, with diminishing returns as chaos caps it."></label>
   <button id="bestofx_run">Run</button>
   <button id="bestofx_abort" style="display:none; background:#a33;">Abort</button>
   <span id="bestofx_status" style="margin-left:12px; color:#ffa;"></span>
@@ -794,10 +794,11 @@ function _checkPlayerEndOfStep(p) {
     // positive values.
     if (Math.floor(p.maxDistPx) % 50 === 0) p.stuckCount = 0;
   }
-  // Record the first step this car passes the finish (the last vertex ≈
-  // ground.distance, same line the backtrack search calls "beating the game").
+  // Record the first step this car reaches the finish = the last solid terrain
+  // vertex (distance - smoothness; the launch lip) — the same line as "completion"
+  // and what the backtrack search calls "beating the game".
   // Human-vs-Human awards the win to whoever crosses FIRST (smallest beatTick).
-  if (!p.beatTick && ground && p.maxDistPx >= ground.distance - 20) p.beatTick = tickCount;
+  if (!p.beatTick && ground && p.maxDistPx >= ground.distance - ground.smoothness) p.beatTick = tickCount;
   var fellOffWorld = !bpInvincible && ypx > CANVAS_HEIGHT;   // fell below the screen into the void
   if (!bpInvincible && (p.car.player.kindaDead || ypx > CANVAS_HEIGHT)) p.dead = true;
   if (p.isAI && !bpInvincible && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
@@ -1847,14 +1848,13 @@ async function runBestOfX() {
   storedGround = roll.ground;
   storedSpawningY = roll.spawningY;
 
-  // A track counts as "complete" within ~950px of the end (matches the Python
-  // best_of_k / deathmap criterion: GROUND_DISTANCE - 350 - 600). Once an
-  // attempt solves the map, further attempts are wasted, so we stop early --
-  // mirroring how a human stops retrying a level once they beat it. The chaos
-  // caps single-map completion at ~70% regardless of strategy (targeted
-  // perturbation and MPC both tested no better than blind jitter), so the win
-  // here is not paying X attempts when the first couple already win.
-  var completePx = storedGround.distance - 950;
+  // A track counts as "complete" when an attempt reaches the LAST solid terrain
+  // vertex (the launch lip / true end = distance - smoothness; score ~1883) — the
+  // same "reached the end" line as beating the game. Once an attempt solves the
+  // map, further attempts are wasted, so we stop early -- mirroring how a human
+  // stops retrying a level once they beat it. (Older builds used a soft line
+  // ~950px short = score 1790; that under-counted the track and is retired.)
+  var completePx = storedGround.distance - storedGround.smoothness;
   var solvedOn = 0;
 
   // No stochastic sampling — the agent stays argmax-greedy (matches how it
@@ -2397,7 +2397,7 @@ async function runBacktrack() {
 
   var p = buildSearchWorld(srcGround, sY);
   var opts = { snapEvery: 20, attempts: 8, margin: 400, budget: budget, branchMaxTicks: 5000,
-               burstMin: 2, burstMax: 8, initDepth: 2, beatPx: ground.distance - 20 };
+               burstMin: 2, burstMax: 8, initDepth: 2, beatPx: ground.distance - ground.smoothness };
   var res;
   try { res = await jsBacktrackSolve(p, opts); }
   catch (e) {
