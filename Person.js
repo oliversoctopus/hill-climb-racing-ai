@@ -1,3 +1,5 @@
+// NOTE: the show() methods in Person/Head/Torso are p5 render, used ONLY by
+// legacy_neat/ (not the web AI site or training path). Kept for legacy_neat. #8.
 class Person {
   constructor(x, y, personWidth, personHeight, world) {
     this.world = world;

@@ -1,3 +1,5 @@
+// NOTE: show() and showPoints() below are p5 render, used ONLY by legacy_neat/
+// (not the web AI site or training path). Kept for legacy_neat. CONVENTIONS.md #8.
 class Ground {
 
   constructor(world) {
@@ -17,14 +19,13 @@ class Ground {
 
     this.grassPositions = [];
     this.steepnessLevel = 50 + difficulty; //from 0 to 200
-    this.estimatedDIfficulty = 0;
+    this.estimatedDifficulty = 0;
 
   }
 
   randomizeGround() {
     let startingPoint = random(100000);
 
-    let totalDifference = 0;
     for (var i = 0; i < this.distance; i += this.smoothness) {
 
       this.steepnessLevel = map(i, 0, this.distance, 130, 250);
@@ -41,9 +42,6 @@ class Ground {
       }
 
       this.vectors.push(new Vec2(i, canvas.height - map(noisedY, 0, 1, minHeight, maxHeight) + heightAddition));
-      if (i > 0) {
-        totalDifference += abs(this.vectors[this.vectors.length - 2].y - this.vectors[this.vectors.length - 1].y);
-      }
 
       //add grass
       for (var j = 0; j < 2; j++) {
@@ -62,7 +60,6 @@ class Ground {
       }
 
     }
-    console.log(totalDifference);
 
     this.vectors.push(new Vec2(this.distance, canvas.height + this.grassThickness * 2));
     this.vectors.push(new Vec2(0, canvas.height + this.grassThickness * 2));
@@ -86,9 +83,7 @@ class Ground {
       }
 
       if (totalDifference > 5) {
-        console.log("shit ground");
         return true;
-
       }
 
     }
