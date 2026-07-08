@@ -9,16 +9,16 @@
 // publishes exactly what the app needs onto `window.HCR` in a one-line classic
 // shim (right after the physics scripts). We re-export it here as normal module
 // bindings. (See CONVENTIONS.md #4 / CLAUDE.md gotcha #4.)
-var H = window.HCR || {};
+const H = window.HCR || {};
 
-export var Car = H.Car;
-export var Ground = H.Ground;
-export var Box2D = H.Box2D;
-export var Vec2 = H.Vec2;
-export var b2World = H.b2World;
-export var b2StaticBody = H.b2StaticBody;
-export var perlinSeed = H.perlinSeed;   // p5-noise permutation seeder (_perlinSeed)
-export var AiPolicy = H.AiPolicy;        // { PpoOnnxAgent, ConstantForwardAgent, ACT }
+export const Car = H.Car;
+export const Ground = H.Ground;
+export const Box2D = H.Box2D;
+export const Vec2 = H.Vec2;
+export const b2World = H.b2World;
+export const b2StaticBody = H.b2StaticBody;
+export const perlinSeed = H.perlinSeed;   // p5-noise permutation seeder (_perlinSeed)
+export const AiPolicy = H.AiPolicy;        // { PpoOnnxAgent, ConstantForwardAgent, ACT }
 
 // `spawningY` and `grassSprites` are genuinely shared with the physics layer:
 // Ground.randomizeGround() WRITES spawningY and READS grassSprites as globals, and

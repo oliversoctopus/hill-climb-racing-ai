@@ -11,40 +11,40 @@
 // --- Physics/geometry constants (single-sourced in the index.html compat shim,
 // which the physics classes read as globals; we re-export them so modules can
 // import explicitly rather than reach for bare globals). ---
-export var SCALE = window.SCALE;                 // px per meter (30)
-export var SPAWN_X = window.SPAWN_X;             // canonical spawn x, px (350)
-export var CANVAS_WIDTH = window.CANVAS_WIDTH;   // one screen, px (1280)
-export var CANVAS_HEIGHT = window.CANVAS_HEIGHT; // px (720); also the fall-off kill line
+export const SCALE = window.SCALE;                 // px per meter (30)
+export const SPAWN_X = window.SPAWN_X;             // canonical spawn x, px (350)
+export const CANVAS_WIDTH = window.CANVAS_WIDTH;   // one screen, px (1280)
+export const CANVAS_HEIGHT = window.CANVAS_HEIGHT; // px (720); also the fall-off kill line
 
 // Physics step rate. Box2D wants a fixed timestep; the loop paces to it.
-export var FRAME_RATE = 30;
-export var SIM_DT = 1.0 / FRAME_RATE;
+export const FRAME_RATE = 30;
+export const SIM_DT = 1.0 / FRAME_RATE;
 
 // AI no-progress timeout — matches python/env.py:244 (the agent trained against it).
-export var STUCK_TIMEOUT_TICKS = 500;
+export const STUCK_TIMEOUT_TICKS = 500;
 
 // --- Player colors ---
-export var AI_COLOR    = { outline: "#5cf", torso: "#3c5ac8", shirtR: 80,  shirtG: 120, shirtB: 200 };
-export var HUMAN_COLOR = { outline: "#fc5", torso: "#c8783c", shirtR: 200, shirtG: 120, shirtB: 60  };
+export const AI_COLOR    = { outline: "#5cf", torso: "#3c5ac8", shirtR: 80,  shirtG: 120, shirtB: 200 };
+export const HUMAN_COLOR = { outline: "#fc5", torso: "#c8783c", shirtR: 200, shirtG: 120, shirtB: 60  };
 // Human-vs-Human: left car (WASD) orange, right car (arrows) green — kept visually
 // distinct so each player can spot both cars on the shared terrain.
-export var HUMAN_L_COLOR = HUMAN_COLOR;
-export var HUMAN_R_COLOR = { outline: "#6f6", torso: "#2f8f2f", shirtR: 90, shirtG: 190, shirtB: 90 };
+export const HUMAN_L_COLOR = HUMAN_COLOR;
+export const HUMAN_R_COLOR = { outline: "#6f6", torso: "#2f8f2f", shirtR: 90, shirtG: 190, shirtB: 90 };
 
 // --- Cheat / bug-probe tuning ---
-export var BP_MAX_LEN = 12000;   // ring-buffer cap (~6.7 min at 30 fps)
-export var FLIGHT_SPEED_MIN = 0, FLIGHT_SPEED_MAX = 60, FLIGHT_SPEED_STEP = 5;
-export var FLIGHT_ROT_RATE = 2.0;   // spin rate (rad/s) while rotate held
-export var FLIGHT_ROT_DAMP = 0.90;  // per-tick angular damping when NOT rotating
-export var ROCKET_ACCEL_MIN = 5, ROCKET_ACCEL_MAX = 120, ROCKET_ACCEL_STEP = 5;
-export var ROCKET_ROT_RATE = 2.0;
-export var ROCKET_ROT_DAMP = 0.90;
-export var ROCKET_LIN_DAMP = 0.99;  // per-tick linear drag so thrust settles at a terminal speed
+export const BP_MAX_LEN = 12000;   // ring-buffer cap (~6.7 min at 30 fps)
+export const FLIGHT_SPEED_MIN = 0, FLIGHT_SPEED_MAX = 60, FLIGHT_SPEED_STEP = 5;
+export const FLIGHT_ROT_RATE = 2.0;   // spin rate (rad/s) while rotate held
+export const FLIGHT_ROT_DAMP = 0.90;  // per-tick angular damping when NOT rotating
+export const ROCKET_ACCEL_MIN = 5, ROCKET_ACCEL_MAX = 120, ROCKET_ACCEL_STEP = 5;
+export const ROCKET_ROT_RATE = 2.0;
+export const ROCKET_ROT_DAMP = 0.90;
+export const ROCKET_LIN_DAMP = 0.99;  // per-tick linear drag so thrust settles at a terminal speed
 
-export var MAX_SESSION_TERRAINS = 30;
+export const MAX_SESSION_TERRAINS = 30;
 
 // --- The single mutable state object ---
-export var S = {
+export const S = {
   // core simulation
   world: null,
   ground: null,

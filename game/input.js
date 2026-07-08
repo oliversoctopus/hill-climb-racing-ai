@@ -16,8 +16,8 @@ export function humanActionWASD() {
 }
 // Lone human (Human-only / Human-vs-AI): drive with EITHER arrows or WASD.
 export function humanActionAny() {
-  var left  = S.humanKeys.left  || S.humanKeysWASD.left;
-  var right = S.humanKeys.right || S.humanKeysWASD.right;
+  const left  = S.humanKeys.left  || S.humanKeysWASD.left;
+  const right = S.humanKeys.right || S.humanKeysWASD.right;
   if (right && !left) return 0;
   if (left && !right) return 1;
   return 2;
@@ -27,7 +27,7 @@ export function humanActionAny() {
 // (whose native arrow-key behavior would switch modes) or another control.
 // preventScroll stops the page from jumping.
 export function focusGame() {
-  var s = document.getElementById("stage");
+  const s = document.getElementById("stage");
   if (s) { try { s.focus({ preventScroll: true }); } catch (e) { s.focus(); } }
 }
 
@@ -37,8 +37,8 @@ function _isFormField(t) { return t && (t.tagName === "INPUT" || t.tagName === "
 // reverse, D/W = forward (mirrors ←/→). We ignore keys while a form field is focused
 // (e.g. the tick-budget input) so typing works, and preventDefault on the game keys.
 export function _handleGameKey(e, down) {
-  var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  var isDriveKey = (k === "ArrowLeft" || k === "ArrowRight" ||
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const isDriveKey = (k === "ArrowLeft" || k === "ArrowRight" ||
                     k === "a" || k === "s" || k === "d" || k === "w");
   // The mode <select> must never consume a driving key — its native arrow behavior
   // switches modes. If one arrives while it's focused, drop focus to the game and let
@@ -67,14 +67,14 @@ export function _handleGameKey(e, down) {
 // disabled state (e.g. Restart is a no-op during a backtrack search).
 export function _handleActionKey(e) {
   if (e.repeat) return;
-  var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (k === "escape") { document.getElementById("keybinds_panel").style.display = "none"; return; }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
-  var map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", h: "bp_altimeter",
+  const map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", h: "bp_altimeter",
               v: "bp_speed", g: "bp_flight", j: "bp_rocket", r: "reset_pos",
               t: "reset", p: "pause" };
-  var id = map[k];
+  const id = map[k];
   if (!id) return;
-  var el = document.getElementById(id);
+  const el = document.getElementById(id);
   if (el) { el.click(); e.preventDefault(); }
 }

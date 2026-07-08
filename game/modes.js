@@ -14,7 +14,7 @@ import {
   S, CANVAS_WIDTH, AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
 } from "./state.js";
 
-export var MODES = {
+export const MODES = {
   ai: {
     label: "AI is driving",
     spawn: [{ agent: "ai" }],

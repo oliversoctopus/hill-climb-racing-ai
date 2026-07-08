@@ -20,27 +20,25 @@ function _bestofxRank(i, n) {
   if (i === 0)     return "1st (best)";
   if (i === 1)     return "2nd";
   if (i === 2)     return "3rd";
-  if (i === n - 1) return (i + 1) + "th (worst)";
-  return (i + 1) + "th";
+  if (i === n - 1) return `${i + 1}th (worst)`;
+  return `${i + 1}th`;
 }
 
 function _bestofxPopulateSelect() {
-  var sel = document.getElementById("bestofx_select");
+  const sel = document.getElementById("bestofx_select");
   sel.innerHTML = "";
-  for (var i = 0; i < S.bestofxRuns.length; i++) {
-    var r = S.bestofxRuns[i];
-    var opt = document.createElement("option");
+  for (let i = 0; i < S.bestofxRuns.length; i++) {
+    const r = S.bestofxRuns[i];
+    const opt = document.createElement("option");
     opt.value = i;
-    opt.textContent = _bestofxRank(i, S.bestofxRuns.length) +
-                      " — score " + r.score +
-                      " (attempt #" + r.attempt + ")";
+    opt.textContent = `${_bestofxRank(i, S.bestofxRuns.length)} — score ${r.score} (attempt #${r.attempt})`;
     sel.appendChild(opt);
   }
   document.getElementById("bestofx_results").style.display = "inline";
 }
 
 export async function runBestOfX() {
-  var X = parseInt(document.getElementById("bestofx_n").value);
+  let X = parseInt(document.getElementById("bestofx_n").value);
   if (!(X > 0)) X = 10;
   if (X > 200) X = 200;
 
@@ -56,40 +54,40 @@ export async function runBestOfX() {
   S.bestofxRuns = [];
 
   // One canonical map for all X attempts.
-  setStatus("Best of " + X + " — rolling map...");
-  var roll = rollAcceptableGround();
+  setStatus(`Best of ${X} — rolling map...`);
+  const roll = rollAcceptableGround();
   S.storedGround = roll.ground;
   S.storedSpawningY = roll.spawningY;
 
   // A track counts as "complete" when an attempt reaches the LAST solid terrain vertex
   // (the launch lip / true end = distance - smoothness; score ~1883) — the same line as
   // beating the game. Once solved, further attempts are wasted, so stop early.
-  var completePx = S.storedGround.distance - S.storedGround.smoothness;
-  var solvedOn = 0;
+  const completePx = S.storedGround.distance - S.storedGround.smoothness;
+  let solvedOn = 0;
 
   // No stochastic sampling — the agent stays argmax-greedy. Each attempt gets a tiny
   // sub-pixel spawn jitter; Box2D's chaotic dynamics amplify it into different runs.
   S.bestofxBusy = true;
 
   try {
-    for (var i = 0; i < X; i++) {
+    for (let i = 0; i < X; i++) {
       if (S.bestofxAbort) break;
-      setStatus("Best of " + X + " — attempt " + (i + 1) + "/" + X + "...");
+      setStatus(`Best of ${X} — attempt ${i + 1}/${X}...`);
       document.getElementById("bestofx_status").textContent =
-        "running " + (i + 1) + "/" + X;
+        `running ${i + 1}/${X}`;
 
       // ±1 px in each axis (≈ ±0.033 m). Below the eye-test threshold, above what Box2D
       // needs to diverge. Stored per-run so the same attempt replays deterministically.
-      var dx = (Math.random() - 0.5) * 2.0;
-      var dy = (Math.random() - 0.5) * 2.0;
+      const dx = (Math.random() - 0.5) * 2.0;
+      const dy = (Math.random() - 0.5) * 2.0;
       S.replayActions = null;
       buildWithGround(S.storedGround, S.storedSpawningY, dx, dy);
-      var p = S.players[0];
-      var actions = [];
+      const p = S.players[0];
+      const actions = [];
       // Tight headless loop — no rendering. await yields the event loop each tick (ORT
       // Web's session.run is async); we also force a setTimeout yield every 200 ticks.
       while (!p.dead) {
-        var act = await S.aiAgent.act({ car: p.car, ground: S.ground, scale: SCALE });
+        const act = await S.aiAgent.act({ car: p.car, ground: S.ground, scale: SCALE });
         actions.push(act);
         applyAction(p.car, act);
         S.world.Step(1.0 / FRAME_RATE, 10, 10);
@@ -97,12 +95,12 @@ export async function runBestOfX() {
         S.tickCount += 1;
         _checkPlayerEndOfStep(p);
         if (actions.length % 200 === 0) {
-          await new Promise(function(r) { setTimeout(r, 0); });
+          await new Promise(r => { setTimeout(r, 0); });
           if (S.bestofxAbort) break;
         }
       }
       if (!p.dead) continue;   // aborted mid-run — skip the partial recording
-      var distPx = Math.max(0, Math.round(p.maxDistPx - SPAWN_X));
+      const distPx = Math.max(0, Math.round(p.maxDistPx - SPAWN_X));
       S.bestofxRuns.push({
         attempt: i + 1,
         distance: distPx,
@@ -129,26 +127,25 @@ export async function runBestOfX() {
     return;
   }
 
-  S.bestofxRuns.sort(function(a, b) { return b.distance - a.distance; });
+  S.bestofxRuns.sort((a, b) => b.distance - a.distance);
   _bestofxPopulateSelect();
 
-  var n = S.bestofxRuns.length;
-  var best = S.bestofxRuns[0].score;
-  var worst = S.bestofxRuns[n - 1].score;
+  const n = S.bestofxRuns.length;
+  const best = S.bestofxRuns[0].score;
+  const worst = S.bestofxRuns[n - 1].score;
   document.getElementById("bestofx_status").textContent =
-    "done — " + n + " runs (best " + best + ", worst " + worst + ")" +
-    (solvedOn ? " — solved on attempt " + solvedOn + ", stopped early" : "");
-  setStatus("Best of " + n + " complete — pick a run and click Watch");
+    `done — ${n} runs (best ${best}, worst ${worst})${solvedOn ? ` — solved on attempt ${solvedOn}, stopped early` : ""}`;
+  setStatus(`Best of ${n} complete — pick a run and click Watch`);
 
   // Show the best run by default so the user sees something immediately.
   watchSelectedRun();
 }
 
 export function watchSelectedRun() {
-  var sel = document.getElementById("bestofx_select");
-  var idx = parseInt(sel.value);
+  const sel = document.getElementById("bestofx_select");
+  let idx = parseInt(sel.value);
   if (!(idx >= 0 && idx < S.bestofxRuns.length)) idx = 0;
-  var run = S.bestofxRuns[idx];
+  const run = S.bestofxRuns[idx];
   // Fresh world + cloned canonical ground + same spawn jitter as the recording. Box2D
   // is deterministic, so identical spawn + identical action sequence reproduces the
   // recorded trajectory frame-accurate.
@@ -156,8 +153,7 @@ export function watchSelectedRun() {
   S.replayActions = run.actions;
   S.replayIdx = 0;
   document.getElementById("bestofx_status").textContent =
-    "watching " + _bestofxRank(idx, S.bestofxRuns.length) +
-    " — score " + run.score + " (attempt #" + run.attempt + ")";
+    `watching ${_bestofxRank(idx, S.bestofxRuns.length)} — score ${run.score} (attempt #${run.attempt})`;
 }
 
 export function _bestofxPanelVisible(show) {
@@ -185,8 +181,8 @@ export function watchGhost(track) {
   S.ghostIdx = -1; S.ghostDone = false;
   S.paused = false; S.lastWallMs = 0; S.accumSec = 0;
   document.getElementById("pause").textContent = "Pause";
-  setStatus((S.ghostBeaten ? "▶ Watching the AI beat " : "▶ Watching the AI's best run on ") +
-            (track.name || "this terrain") + " (" + S.ghostPoses.length + " frames)");
+  setStatus(`${(S.ghostBeaten ? "▶ Watching the AI beat " : "▶ Watching the AI's best run on ") +
+          (track.name || "this terrain")} (${S.ghostPoses.length} frames)`);
 }
 
 // ---- Save-scum backtracking search --------------------------------------
@@ -194,9 +190,9 @@ export function watchGhost(track) {
 // pose/velocity (re-satisfies the joints and clears the impulse cache the SAME way
 // every time) — the Python "reset" path, so the ghost replay reproduces the run exactly.
 function saveCarState(car) {
-  var bs = car.bodies(), arr = [];
-  for (var i = 0; i < bs.length; i++) {
-    var b = bs[i], p = b.GetPosition(), v = b.GetLinearVelocity();
+  const bs = car.bodies(), arr = [];
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i], p = b.GetPosition(), v = b.GetLinearVelocity();
     arr.push([p.x, p.y, b.GetAngle(), v.x, v.y, b.GetAngularVelocity()]);
   }
   return { bodies: arr, og0: car.wheels[0].onGround === true,
@@ -207,15 +203,15 @@ function saveCarState(car) {
 // pose re-satisfies every joint. Mirrors js_backend resetCar().
 function rebuildSearchCar(p) {
   p.car.destroy(S.world);
-  var dummy = { shirtColorR: AI_COLOR.shirtR, shirtColorG: AI_COLOR.shirtG,
+  const dummy = { shirtColorR: AI_COLOR.shirtR, shirtColorG: AI_COLOR.shirtG,
                 shirtColorB: AI_COLOR.shirtB, dead: false, kindaDead: false };
   p.car = new Car(SPAWN_X, getSpawningY(), S.world, dummy);
 }
 function restoreCarState(p, snap) {
   rebuildSearchCar(p);                   // fresh car (impulse cache cleared consistently)
-  var bs = p.car.bodies();
-  for (var i = 0; i < bs.length; i++) {
-    var r = snap.bodies[i], b = bs[i];
+  const bs = p.car.bodies();
+  for (let i = 0; i < bs.length; i++) {
+    const r = snap.bodies[i], b = bs[i];
     b.SetPositionAndAngle(new Vec2(r[0], r[1]), r[2]);
     b.SetLinearVelocity(new Vec2(r[3], r[4]));
     b.SetAngularVelocity(r[5]); b.SetAwake(true);
@@ -234,7 +230,7 @@ function buildSearchWorld(srcGround, sY) {
   S.ground = new Ground(S.world);
   S.ground.cloneFrom(srcGround);
   S.ground.setBodies(S.world);
-  var p = makePlayer(S.aiAgent, AI_COLOR);
+  const p = makePlayer(S.aiAgent, AI_COLOR);
   S.players = [p];
   S.tickCount = 0; S.cameraPanX = 0; S.cameraPanY = 0;
   return p;
@@ -242,14 +238,18 @@ function buildSearchWorld(srcGround, sY) {
 // One forward rollout from the search car's CURRENT state (burst actions first, then
 // the AI policy). Records actions + periodic snapshots; yields to the UI.
 async function btRoll(p, startAidx, burst, opts) {
-  var actions = [], snaps = [], maxX = p.maxDistPx, beaten = false, t = 0;
+  const actions = [];
+  const snaps = [];
+  let maxX = p.maxDistPx;
+  let beaten = false;
+  let t = 0;
   while (true) {
     if (t % opts.snapEvery === 0) {
       snaps.push({ aidx: startAidx + actions.length, car: saveCarState(p.car),
                    agent: S.aiAgent.snapshotState(), maxDistPx: p.maxDistPx,
                    stuckCount: p.stuckCount });
     }
-    var act = (t < burst.length) ? burst[t]
+    const act = (t < burst.length) ? burst[t]
             : await S.aiAgent.act({ car: p.car, ground: S.ground, scale: SCALE });
     applyAction(p.car, act);
     S.world.Step(1.0 / FRAME_RATE, 10, 10);
@@ -262,19 +262,19 @@ async function btRoll(p, startAidx, burst, opts) {
     if (t >= opts.branchMaxTicks) return { actions: actions, snaps: snaps, maxX: maxX, status: beaten ? "complete" : "trunc",  n: t };
     if (opts.ticks.n >= opts.budget) return { actions: actions, snaps: snaps, maxX: maxX, status: beaten ? "complete" : "budget", n: t };
     if (t % 256 === 0) {
-      await new Promise(function(r) { setTimeout(r, 0); });
+      await new Promise(r => { setTimeout(r, 0); });
       if (S.backtrackAbort) return { actions: actions, snaps: snaps, maxX: maxX, status: "abort", n: t };
       document.getElementById("backtrack_status").textContent =
-        "searching… tries " + opts.prog.tries + ", deepest rewind " + opts.prog.maxDepth +
-        ", reached score " + scorePx(maxX) +
-        " (tick " + opts.ticks.n + "/" + opts.budget + ")";
+        `searching… tries ${opts.prog.tries}, deepest rewind ${opts.prog.maxDepth}, reached score ${scorePx(maxX)} (tick ${opts.ticks.n}/${opts.budget})`;
     }
   }
 }
 function commitSegments(segments, seam, bActions) {
-  var start = seam.aidx, base = 0, out = [];
-  for (var i = 0; i < segments.length; i++) {
-    var seg = segments[i], L = seg.actions.length;
+  const start = seam.aidx;
+  let base = 0;
+  const out = [];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i], L = seg.actions.length;
     if (start >= base + L) { out.push(seg); base += L; }
     else { if (start - base > 0) out.push({ start: seg.start, actions: seg.actions.slice(0, start - base) }); break; }
   }
@@ -288,32 +288,32 @@ function restoreSearch(p, snap) {
 }
 async function jsBacktrackSolve(p, opts) {
   opts.ticks = { n: 0 }; opts.prog = { tries: 1, maxDepth: 0 };
-  var r = await btRoll(p, 0, [], opts);
-  var segments = [{ start: r.snaps[0], actions: r.actions }];
-  var tries = 1, backtracks = 0, bottlenecks = 0, maxDepth = 0;
+  const r = await btRoll(p, 0, [], opts);
+  let segments = [{ start: r.snaps[0], actions: r.actions }];
+  let tries = 1, backtracks = 0, bottlenecks = 0, maxDepth = 0;
   // Track the FURTHEST run ever seen (even attempts that died without clearing a wall),
   // not just the committed bottleneck — so a non-beaten search still shows its deepest
   // attempt as the "best run", not the last committed section.
-  var bestMaxX = r.maxX, bestSegments = segments;
+  let bestMaxX = r.maxX, bestSegments = segments;
   function out(o) { o.tries = tries; o.backtracks = backtracks; o.bottlenecks = bottlenecks;
                     o.maxDepth = maxDepth; o.ticks = opts.ticks.n; return o; }
   if (r.status === "abort")    return out({ solved: false, reason: "abort", maxX: r.maxX, segments: null });
   if (r.status === "complete") return out({ solved: true, reason: "single-shot", maxX: r.maxX, segments: segments });
-  var committed = r.actions, csnaps = r.snaps, bottleneck = r.maxX, depth = opts.initDepth;
+  let committed = r.actions, csnaps = r.snaps, bottleneck = r.maxX, depth = opts.initDepth;
   while (opts.ticks.n < opts.budget) {
     if (S.backtrackAbort)      return out({ solved: false, reason: "abort", maxX: bottleneck, segments: null });
     if (depth > csnaps.length) return out({ solved: false, reason: "exhausted", maxX: bestMaxX, segments: bestSegments });
-    var seam = csnaps[csnaps.length - depth];
+    const seam = csnaps[csnaps.length - depth];
     if (depth > maxDepth) maxDepth = depth;
     opts.prog.maxDepth = maxDepth;
-    var cleared = false;
-    for (var a = 0; a < opts.attempts; a++) {
+    let cleared = false;
+    for (let a = 0; a < opts.attempts; a++) {
       if (opts.ticks.n >= opts.budget || S.backtrackAbort) break;
       restoreSearch(p, seam);
-      var bl = opts.burstMin + Math.floor(Math.random() * (opts.burstMax - opts.burstMin + 1));
-      var burst = [];
-      for (var k = 0; k < bl; k++) burst.push(Math.floor(Math.random() * 3));
-      var b = await btRoll(p, seam.aidx, burst, opts);
+      const bl = opts.burstMin + Math.floor(Math.random() * (opts.burstMax - opts.burstMin + 1));
+      const burst = [];
+      for (let k = 0; k < bl; k++) burst.push(Math.floor(Math.random() * 3));
+      const b = await btRoll(p, seam.aidx, burst, opts);
       tries += 1; opts.prog.tries = tries;
       if (b.status === "abort") return out({ solved: false, reason: "abort", maxX: bottleneck, segments: null });
       // Remember this attempt if it's the deepest yet (stitch it onto the run so far).
@@ -325,7 +325,7 @@ async function jsBacktrackSolve(p, opts) {
       }
       if (b.maxX >= bottleneck + opts.margin) {     // cleared this wall, died later
         committed = committed.slice(0, seam.aidx).concat(b.actions);
-        csnaps = csnaps.filter(function(s) { return s.aidx < seam.aidx; }).concat(b.snaps);
+        csnaps = csnaps.filter(s => s.aidx < seam.aidx).concat(b.snaps);
         segments = commitSegments(segments, seam, b.actions);
         bottleneck = b.maxX; bottlenecks += 1; depth = opts.initDepth; cleared = true;
         break;
@@ -338,11 +338,12 @@ async function jsBacktrackSolve(p, opts) {
 // Replay the committed segments (rebuild+teleport at each seam, play recorded actions)
 // capturing a per-tick pose stream — exact reproduction of the run.
 function jsReplaySegments(p, segments) {
-  var poses = [], dims = null;
-  for (var si = 0; si < segments.length; si++) {
-    var seg = segments[si];
+  const poses = [];
+  let dims = null;
+  for (let si = 0; si < segments.length; si++) {
+    const seg = segments[si];
     restoreCarState(p, seg.start.car);
-    for (var ai = 0; ai < seg.actions.length; ai++) {
+    for (let ai = 0; ai < seg.actions.length; ai++) {
       applyAction(p.car, seg.actions[ai]);
       S.world.Step(1.0 / FRAME_RATE, 10, 10); S.world.ClearForces();
       if (!dims) dims = { chassis_w: p.car.chassisWidth, chassis_h: p.car.chassisHeight,
@@ -367,21 +368,21 @@ export async function runBacktrack() {
   // split-screen world causes camera/render bugs. Force AI-only first, reusing the
   // CURRENT terrain so we still search the exact map that was on screen.
   if (S.mode === "hvh") {
-    var keepGround = { vectors: S.ground.vectors.map(function(v) { return new Vec2(v.x, v.y); }),
+    const keepGround = { vectors: S.ground.vectors.map(v => new Vec2(v.x, v.y)),
                        grassPositions: S.ground.grassPositions.slice() };
     S.mode = "ai";
-    var modeSel = document.getElementById("mode");
+    const modeSel = document.getElementById("mode");
     if (modeSel) modeSel.value = "ai";
     _bestofxPanelVisible(false);
     _setupHiDPI();                              // shrink the 2×-wide split canvas back to 1×
     buildWithGround(keepGround, getSpawningY(), 0, 0);
   }
   // Snapshot the CURRENT terrain (clone vectors; keep a px copy for loadedTrack reuse).
-  var srcGround = { vectors: S.ground.vectors.map(function(v) { return new Vec2(v.x, v.y); }),
+  const srcGround = { vectors: S.ground.vectors.map(v => new Vec2(v.x, v.y)),
                     grassPositions: S.ground.grassPositions.slice() };
-  var sY = getSpawningY();
-  var pxVerts = S.ground.vectors.map(function(v) { return [v.x * SCALE, v.y * SCALE]; });
-  var budget = parseInt(document.getElementById("backtrack_budget").value) || 120000;
+  const sY = getSpawningY();
+  const pxVerts = S.ground.vectors.map(v => [v.x * SCALE, v.y * SCALE]);
+  const budget = parseInt(document.getElementById("backtrack_budget").value) || 120000;
 
   S.backtrackAbort = false; S.bestofxBusy = true; _btUI(true);
   S.ghostPoses = null; S.ghostDone = false;
@@ -389,52 +390,44 @@ export async function runBacktrack() {
   setStatus("Backtracking on this terrain — searching for a run that beats the game…");
   document.getElementById("backtrack_status").textContent = "starting…";
 
-  var p = buildSearchWorld(srcGround, sY);
-  var opts = { snapEvery: 20, attempts: 8, margin: 400, budget: budget, branchMaxTicks: 5000,
+  const p = buildSearchWorld(srcGround, sY);
+  const opts = { snapEvery: 20, attempts: 8, margin: 400, budget: budget, branchMaxTicks: 5000,
                burstMin: 2, burstMax: 8, initDepth: 2, beatPx: S.ground.distance - S.ground.smoothness };
-  var res;
+  let res;
   try { res = await jsBacktrackSolve(p, opts); }
   catch (e) {
-    res = { solved: false, reason: "error: " + e.message, tries: 0, backtracks: 0,
+    res = { solved: false, reason: `error: ${e.message}`, tries: 0, backtracks: 0,
             bottlenecks: 0, maxDepth: 0, maxX: 0, segments: null };
   }
   _btUI(false); S.bestofxBusy = false; S.lastWallMs = 0;
 
-  var depthSec = (res.maxDepth * opts.snapEvery / FRAME_RATE).toFixed(1);
+  const depthSec = (res.maxDepth * opts.snapEvery / FRAME_RATE).toFixed(1);
   if (res.solved && res.segments) {
-    var rep = jsReplaySegments(p, res.segments);      // sync, atomic w.r.t. the RAF loop
-    var score = scorePx(res.maxX);
+    const rep = jsReplaySegments(p, res.segments);      // sync, atomic w.r.t. the RAF loop
+    const score = scorePx(res.maxX);
     S.loadedTrack = { vertices: pxVerts, spawning_y: sY, poses: rep.poses, dims: rep.dims,
                       beat_score: score, name: "this random terrain (beaten)" };
     document.getElementById("backtrack_status").textContent =
-      "✓ BEAT in " + res.tries + " tries, " + res.backtracks + " backtracks " +
-      "(deepest rewind " + res.maxDepth + " snaps ≈ " + depthSec + "s; " +
-      res.bottlenecks + " bottleneck" + (res.bottlenecks === 1 ? "" : "s") + ") — " +
-      "score " + score + " in " + res.ticks + " ticks. Replaying…";
+      `✓ BEAT in ${res.tries} tries, ${res.backtracks} backtracks (deepest rewind ${res.maxDepth} snaps ≈ ${depthSec}s; ${res.bottlenecks} bottleneck${res.bottlenecks === 1 ? "" : "s"}) — score ${score} in ${res.ticks} ticks. Replaying…`;
     watchGhost(S.loadedTrack);
   } else if (res.segments) {
     // Didn't beat the game, but the search made real progress — replay the AI's BEST
     // (deepest committed) stitched run as a ghost instead of just resetting.
-    var rep2 = jsReplaySegments(p, res.segments);
-    var reached = scorePx(res.maxX);
+    const rep2 = jsReplaySegments(p, res.segments);
+    const reached = scorePx(res.maxX);
     S.loadedTrack = { vertices: pxVerts, spawning_y: sY, poses: rep2.poses, dims: rep2.dims,
                       beat_score: reached, beaten: false,
                       name: "this random terrain (AI best run — not beaten)" };
     document.getElementById("backtrack_status").textContent =
-      "did NOT beat (" + res.reason + ") after " + res.tries + " tries, " +
-      res.backtracks + " backtracks; best reached score " + reached +
-      (res.reason === "budget" ? " — raise the tick budget and retry" : "") +
-      " — replaying the AI's best run…";
+      `did NOT beat (${res.reason}) after ${res.tries} tries, ${res.backtracks} backtracks; best reached score ${reached}${res.reason === "budget" ? " — raise the tick budget and retry" : ""} — replaying the AI's best run…`;
     watchGhost(S.loadedTrack);
   } else {
     // No replayable run (user aborted, or an error) — keep the terrain loaded to retry.
     S.loadedTrack = { vertices: pxVerts, spawning_y: sY, name: "this random terrain" };
     buildSimulation();
-    var reached3 = scorePx(res.maxX);
+    const reached3 = scorePx(res.maxX);
     document.getElementById("backtrack_status").textContent =
-      (res.reason === "abort" ? "aborted" : "did NOT beat (" + res.reason + ")") +
-      " after " + res.tries + " tries, " + res.backtracks + " backtracks; deepest reached score " +
-      reached3 + (res.reason === "budget" ? " — raise the tick budget and retry" : "");
-    setStatus("Ready — " + modeLabel());
+      `${res.reason === "abort" ? "aborted" : `did NOT beat (${res.reason})`} after ${res.tries} tries, ${res.backtracks} backtracks; deepest reached score ${reached3}${res.reason === "budget" ? " — raise the tick budget and retry" : ""}`;
+    setStatus(`Ready — ${modeLabel()}`);
   }
 }

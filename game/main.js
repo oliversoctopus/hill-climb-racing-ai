@@ -21,15 +21,15 @@ export function setStatus(s) { document.getElementById("status").textContent = s
 // ---- Assets --------------------------------------------------------------
 // Mirrors sketch.js preload() — the same files the original browser game used.
 function _loadImg(src) {
-  return new Promise(function(resolve, reject) {
-    var img = new Image();
-    img.onload = function() { resolve(img); };
-    img.onerror = function() { reject(new Error("failed to load " + src)); };
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { resolve(img); };
+    img.onerror = () => { reject(new Error(`failed to load ${src}`)); };
     img.src = src;
   });
 }
 async function loadAssets() {
-  var paths = {
+  const paths = {
     sky:    "Pics/sky.png",
     car:    "Pics/car.png",
     wheel:  "Pics/wheel2.png",
@@ -41,9 +41,9 @@ async function loadAssets() {
     g3:    "Pics/grass4.png",
     g4:    "Pics/grass5.png",
   };
-  var keys = Object.keys(paths);
-  var imgs = await Promise.all(keys.map(function(k) { return _loadImg(paths[k]); }));
-  for (var i = 0; i < keys.length; i++) S.assets[keys[i]] = imgs[i];
+  const keys = Object.keys(paths);
+  const imgs = await Promise.all(keys.map(k => _loadImg(paths[k])));
+  for (let i = 0; i < keys.length; i++) S.assets[keys[i]] = imgs[i];
   S.assets.grass = [S.assets.g0, S.assets.g1, S.assets.g2, S.assets.g3, S.assets.g4];
   // Replace the stub grassSprites polyfill with the real loaded array so
   // Ground.randomizeGround()'s grassPositions stay valid for rendering.
@@ -54,16 +54,16 @@ function _setupHiDPI() {
   // On HiDPI displays devicePixelRatio > 1. Bump the backing store and scale the
   // context so 1 canvas-unit = 1 CSS-pixel (crisp, not upscaled). Width tracks the
   // mode (hvh = 2× for split screen); re-run this whenever the mode changes.
-  var canvas = document.getElementById("stage");
-  var ctx = canvas.getContext("2d");
-  var dpr = window.devicePixelRatio || 1;
-  var w = stageWidth();
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const w = stageWidth();
   canvas.width  = w * dpr;
   canvas.height = CANVAS_HEIGHT * dpr;
   // Cap the DISPLAY size at the logical (CSS-px) resolution; CSS max-width:100% +
   // height:auto shrink it to fit narrower viewports without distortion; margin:auto
   // centers it. Set only the width so height:auto keeps aspect.
-  canvas.style.width  = w + "px";
+  canvas.style.width  = `${w}px`;
   canvas.style.removeProperty("height");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
@@ -76,18 +76,18 @@ export { _setupHiDPI };
 // corresponds to. simSpeed multiplies the accumulator so "2x" = 2 simulated seconds
 // per real second.
 async function loop() {
-  var now = performance.now();
+  const now = performance.now();
   if (S.lastWallMs === 0) S.lastWallMs = now;
   // Real wall seconds since last frame. Cap at 100ms so a tab-background pause doesn't
   // cause a burst of catch-up steps when we resume.
-  var realDt = Math.min(0.1, (now - S.lastWallMs) / 1000);
+  const realDt = Math.min(0.1, (now - S.lastWallMs) / 1000);
   S.lastWallMs = now;
 
-  var didStep = false;
+  let didStep = false;
   if (!S.paused && S.aiAgent && !S.bestofxBusy) {
     S.accumSec += realDt * S.simSpeed;
     while (S.accumSec >= SIM_DT) {
-      var allDead = await runOneStep();
+      const allDead = await runOneStep();
       S.accumSec -= SIM_DT;
       didStep = true;
       if (allDead) { S.accumSec = 0; break; }
@@ -111,7 +111,7 @@ async function init() {
   try {
     await loadAssets();
   } catch (e) {
-    setStatus("ERROR loading assets: " + e.message);
+    setStatus(`ERROR loading assets: ${e.message}`);
     throw e;
   }
 
@@ -122,28 +122,28 @@ async function init() {
   try {
     await S.aiAgent.init();
   } catch (e) {
-    setStatus("ERROR loading agent: " + e.message);
+    setStatus(`ERROR loading agent: ${e.message}`);
     throw e;
   }
 
   setStatus("Building simulation...");
   buildSimulation();
-  setStatus("Ready — " + modeLabel());
+  setStatus(`Ready — ${modeLabel()}`);
   requestAnimationFrame(loop);
 }
 
 // ---- DOM wiring ----------------------------------------------------------
 // Top controls
-document.getElementById("reset_pos").onclick = function() {
+document.getElementById("reset_pos").onclick = () => {
   // "Restart (same terrain)" — put the car(s) back at the start of THIS map. No new
   // terrain: rebuild from a clone of the current ground. Exits ghost mode.
   S.replayActions = null;
   S.ghostPoses = null; S.ghostDone = false;
   setStatus("Restarting on the same terrain...");
   buildWithGround(currentGroundSource(), getSpawningY(), 0, 0);
-  setStatus("Ready — " + modeLabel());
+  setStatus(`Ready — ${modeLabel()}`);
 };
-document.getElementById("reset").onclick = function() {
+document.getElementById("reset").onclick = () => {
   // "Regenerate terrain" — throw away this map and generate a brand-new random one.
   if (S.mode === "bestofx") {
     S.bestofxRuns = [];
@@ -155,16 +155,16 @@ document.getElementById("reset").onclick = function() {
   S.loadedTrack = null;
   setStatus("Building new terrain...");
   buildSimulation();
-  setStatus("Ready — " + modeLabel());
+  setStatus(`Ready — ${modeLabel()}`);
 };
 document.getElementById("terrain_select").onchange = function() {
   // Re-load a map generated earlier this session. Pinning it via loadedTrack means
   // Restart re-drives it and a Mode switch keeps it (Regenerate clears it).
-  var id = parseInt(this.value, 10);
+  const id = parseInt(this.value, 10);
   this.blur(); focusGame();
   if (!id) return;
-  var t = null;
-  for (var i = 0; i < S.sessionTerrains.length; i++) if (S.sessionTerrains[i].id === id) { t = S.sessionTerrains[i]; break; }
+  let t = null;
+  for (let i = 0; i < S.sessionTerrains.length; i++) if (S.sessionTerrains[i].id === id) { t = S.sessionTerrains[i]; break; }
   if (!t) return;
   if (S.mode === "bestofx") {   // clear stale Best-of-X runs like Regenerate does
     S.bestofxRuns = [];
@@ -172,7 +172,7 @@ document.getElementById("terrain_select").onchange = function() {
     document.getElementById("bestofx_status").textContent = "";
   }
   S.loadedTrack = { vertices: t.vertices, spawning_y: t.spawning_y, name: t.name };
-  setStatus("Loaded " + t.name + " — " + modeLabel());
+  setStatus(`Loaded ${t.name} — ${modeLabel()}`);
   buildSimulation();
 };
 document.getElementById("pause").onclick = function() {
@@ -187,9 +187,9 @@ document.getElementById("mode").onchange = function() {
   S.mode = this.value;
   _bestofxPanelVisible(S.mode === "bestofx");
   _setupHiDPI();   // resize the canvas (hvh = 2× wide split screen; others = 1×)
-  setStatus("Building " + S.mode + " mode...");
+  setStatus(`Building ${S.mode} mode...`);
   buildSimulation();
-  setStatus("Ready — " + modeLabel());
+  setStatus(`Ready — ${modeLabel()}`);
   // Move keyboard focus OFF the dropdown so driving keys go to the game instead of
   // scrolling the <select>.
   this.blur();
@@ -197,13 +197,13 @@ document.getElementById("mode").onchange = function() {
 };
 
 // Best of X
-document.getElementById("bestofx_run").onclick   = function() { runBestOfX(); };
-document.getElementById("bestofx_abort").onclick = function() { S.bestofxAbort = true; };
-document.getElementById("bestofx_watch").onclick = function() { watchSelectedRun(); };
+document.getElementById("bestofx_run").onclick   = () => { runBestOfX(); };
+document.getElementById("bestofx_abort").onclick = () => { S.bestofxAbort = true; };
+document.getElementById("bestofx_watch").onclick = () => { watchSelectedRun(); };
 
 // Backtrack search
-document.getElementById("backtrack_run").onclick = function() { runBacktrack(); };
-document.getElementById("backtrack_abort").onclick = function() { S.backtrackAbort = true; };
+document.getElementById("backtrack_run").onclick = () => { runBacktrack(); };
+document.getElementById("backtrack_abort").onclick = () => { S.backtrackAbort = true; };
 
 // Cheats / bug probe
 document.getElementById("bp_invince").onchange = function() {
@@ -228,9 +228,7 @@ document.getElementById("bp_flight").onchange = function() {
     S.bpRocket = false; document.getElementById("bp_rocket").checked = false;
   }
   bpSetStatus(S.bpFlight
-    ? "Flight mode ON — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, " +
-      "←/A & →/D rotate); release forward/back to stop dead in the air. Speed " +
-      S.flightSpeed + " m/s; scroll wheel to adjust (0–60). Tip: Invincible survives crashes."
+    ? `Flight mode ON — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release forward/back to stop dead in the air. Speed ${S.flightSpeed} m/s; scroll wheel to adjust (0–60). Tip: Invincible survives crashes.`
     : "Flight mode OFF.");
 };
 document.getElementById("bp_rocket").onchange = function() {
@@ -239,36 +237,32 @@ document.getElementById("bp_rocket").onchange = function() {
     S.bpFlight = false; document.getElementById("bp_flight").checked = false;
   }
   bpSetStatus(S.bpRocket
-    ? "Rocket mode ON — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, " +
-      "←/A & →/D rotate). Thrust " + S.rocketAccel + " m/s²; scroll wheel to adjust. " +
-      "Tip: turn on Invincible to survive crashes."
+    ? `Rocket mode ON — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate). Thrust ${S.rocketAccel} m/s²; scroll wheel to adjust. Tip: turn on Invincible to survive crashes.`
     : "Rocket mode OFF.");
 };
 // Scroll wheel over the canvas adjusts whichever fly cheat is active: Flight speed
 // (0–60) or Rocket thrust. passive:false so we can preventDefault the page scroll.
-document.getElementById("stage").addEventListener("wheel", function(e) {
+document.getElementById("stage").addEventListener("wheel", e => {
   if (S.bpFlight) {
     e.preventDefault();
-    var d = (e.deltaY < 0 ? 1 : -1) * FLIGHT_SPEED_STEP;
+    const d = (e.deltaY < 0 ? 1 : -1) * FLIGHT_SPEED_STEP;
     S.flightSpeed = Math.max(FLIGHT_SPEED_MIN, Math.min(FLIGHT_SPEED_MAX, S.flightSpeed + d));
-    bpSetStatus("Flight speed " + S.flightSpeed + " m/s  (scroll up = faster, down = slower; " +
-                FLIGHT_SPEED_MIN + "–" + FLIGHT_SPEED_MAX + ")");
+    bpSetStatus(`Flight speed ${S.flightSpeed} m/s  (scroll up = faster, down = slower; ${FLIGHT_SPEED_MIN}–${FLIGHT_SPEED_MAX})`);
   } else if (S.bpRocket) {
     e.preventDefault();
-    var d2 = (e.deltaY < 0 ? 1 : -1) * ROCKET_ACCEL_STEP;
+    const d2 = (e.deltaY < 0 ? 1 : -1) * ROCKET_ACCEL_STEP;
     S.rocketAccel = Math.max(ROCKET_ACCEL_MIN, Math.min(ROCKET_ACCEL_MAX, S.rocketAccel + d2));
-    bpSetStatus("Rocket thrust " + S.rocketAccel + " m/s²  (scroll up = faster, down = slower; " +
-                ROCKET_ACCEL_MIN + "–" + ROCKET_ACCEL_MAX + ")");
+    bpSetStatus(`Rocket thrust ${S.rocketAccel} m/s²  (scroll up = faster, down = slower; ${ROCKET_ACCEL_MIN}–${ROCKET_ACCEL_MAX})`);
   }
 }, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_flag").onclick     = bpFlag;
 document.getElementById("bp_download").onclick = bpDownload;
-document.getElementById("bp_applyphys").onclick = function() { bpApplyPhys(true); };
-["bp_chassisdamp", "bp_wheeldamp", "bp_suspfreq", "bp_suspdamp"].forEach(function(id) {
-  document.getElementById(id).onchange = function() { bpApplyPhys(true); };
+document.getElementById("bp_applyphys").onclick = () => { bpApplyPhys(true); };
+["bp_chassisdamp", "bp_wheeldamp", "bp_suspfreq", "bp_suspdamp"].forEach(id => {
+  document.getElementById(id).onchange = () => { bpApplyPhys(true); };
 });
-document.getElementById("bp_unmask").onclick = function() {
+document.getElementById("bp_unmask").onclick = () => {
   // Drive the suspension instability hard so the latent spin becomes obvious: no
   // chassis/wheel angular damping + a very stiff, under-damped suspension spring. It's
   // resonance-driven, so DRIVE around / over bumps to provoke it.
@@ -278,7 +272,7 @@ document.getElementById("bp_unmask").onclick = function() {
   document.getElementById("bp_suspdamp").value    = "0.3";
   bpApplyPhys(true);
 };
-document.getElementById("bp_resetphys").onclick = function() {
+document.getElementById("bp_resetphys").onclick = () => {
   document.getElementById("bp_chassisdamp").value = "0.1";
   document.getElementById("bp_wheeldamp").value   = "1.8";
   document.getElementById("bp_suspfreq").value    = "70";
@@ -288,13 +282,12 @@ document.getElementById("bp_resetphys").onclick = function() {
   document.getElementById("bp_motortorque").value = "1";
   bpApplyPhys(true);
 };
-document.getElementById("bp_wheelfric").onchange = function() { bpApplyPhys(true); };
+document.getElementById("bp_wheelfric").onchange = () => { bpApplyPhys(true); };
 document.getElementById("bp_motorspeed").onchange =
-document.getElementById("bp_motortorque").onchange = function() {
-  bpSetStatus("motor speed ×" + _bpNum("bp_motorspeed", 1) + " torque ×" +
-              _bpNum("bp_motortorque", 1) + " (applied live while driving)");
+document.getElementById("bp_motortorque").onchange = () => {
+  bpSetStatus(`motor speed ×${_bpNum("bp_motorspeed", 1)} torque ×${_bpNum("bp_motortorque", 1)} (applied live while driving)`);
 };
-document.getElementById("bp_motorspin").onclick = function() {
+document.getElementById("bp_motorspin").onclick = () => {
   // Double the motor's target speed — the lever that reproduces the sustained CCW spin.
   // Drive / floor it (into a hill, or after a flip) to provoke it.
   document.getElementById("bp_motorspeed").value  = "2";
@@ -303,18 +296,18 @@ document.getElementById("bp_motorspin").onclick = function() {
 };
 
 // Keybinds cheat-sheet overlay.
-document.getElementById("keybinds_btn").onclick = function() {
-  var pnl = document.getElementById("keybinds_panel");
+document.getElementById("keybinds_btn").onclick = () => {
+  const pnl = document.getElementById("keybinds_panel");
   pnl.style.display = (pnl.style.display === "none") ? "block" : "none";
 };
-document.getElementById("keybinds_close").onclick = function() {
+document.getElementById("keybinds_close").onclick = () => {
   document.getElementById("keybinds_panel").style.display = "none";
   focusGame();
 };
 
 // Keyboard + focus
-window.addEventListener("keydown", function(e) { _handleGameKey(e, true); _handleActionKey(e); });
-window.addEventListener("keyup",   function(e) { _handleGameKey(e, false); });
+window.addEventListener("keydown", e => { _handleGameKey(e, true); _handleActionKey(e); });
+window.addEventListener("keyup",   e => { _handleGameKey(e, false); });
 document.getElementById("stage").addEventListener("mousedown", focusGame);
 
-window.addEventListener("load", function() { init(); focusGame(); });
+window.addEventListener("load", () => { init(); focusGame(); });
