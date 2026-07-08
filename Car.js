@@ -277,6 +277,38 @@ class Car {
     this.wheels[1].joint.EnableMotor(false);
   }
 
+  // Every dynamic body that makes up the vehicle, in a STABLE order: chassis, both
+  // wheels + their rims, then the driver's torso & head. A read-only inventory so
+  // callers (renderer's whole-vehicle CoM/speed math; the save-scum search's
+  // snapshot / teardown) don't hard-code the body list. The search pairs saved
+  // poses back to bodies by index, so the order must not change.
+  bodies() {
+    return [this.chassisBody,
+            this.wheels[0].body, this.wheels[0].rimBody,
+            this.wheels[1].body, this.wheels[1].rimBody,
+            this.person.torso.body, this.person.head.body];
+  }
 
+  // Remove every joint and body this car owns from `world`. Used by the save-scum
+  // search to rebuild a fresh car at a rewind point (the constructor re-bakes the
+  // joint anchors, so a following teleport re-satisfies them). Each destroy is
+  // guarded because a death may already have destroyed some joints (a head-ground
+  // hit splits the car by destroying its joints — see index.html's contact listener).
+  destroy(world) {
+    try { world.DestroyJoint(this.distJoint); } catch (e) {}
+    try { world.DestroyJoint(this.revJoint); } catch (e) {}
+    try { if (this.person && this.person.distJoint) world.DestroyJoint(this.person.distJoint); } catch (e) {}
+    try { if (this.person && this.person.headJoint) world.DestroyJoint(this.person.headJoint); } catch (e) {}
+    try {
+      for (var i = 0; i < this.wheels.length; i++) {
+        var w = this.wheels[i];
+        if (w.joint) world.DestroyJoint(w.joint);
+        if (w.prisJoint) world.DestroyJoint(w.prisJoint);
+        if (w.distJoint) world.DestroyJoint(w.distJoint);
+      }
+    } catch (e) {}
+    var bs = this.bodies();
+    for (var j = 0; j < bs.length; j++) { try { world.DestroyBody(bs[j]); } catch (e) {} }
+  }
 
 }

@@ -1,0 +1,386 @@
+// Simulation core: world/terrain/car construction, the per-tick step, death
+// checks, and the small vehicle-geometry helpers the rest of the app shares.
+import {
+  S, SCALE, SPAWN_X, FRAME_RATE, STUCK_TIMEOUT_TICKS, MAX_SESSION_TERRAINS,
+} from "./state.js";
+import {
+  Car, Ground, Box2D, Vec2, b2World, b2StaticBody, perlinSeed,
+  getSpawningY, setSpawningY,
+} from "./bridge.js";
+import { modeDef, spawnColor } from "./modes.js";
+import { isBelowKillLine } from "./geom.js";
+import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
+import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG } from "./cheats.js";
+
+// ---- Score metric --------------------------------------------------------
+// Project score: (max forward px − spawn) / 10, floored, >= 0. Matches eval.py
+// and Code Bullet's Player.js. `scorePx` takes a raw x in px; `scoreOf` a player.
+export function scorePx(px) { return Math.max(0, Math.floor((px - SPAWN_X) / 10)); }
+export function scoreOf(p) { return scorePx(p.maxDistPx); }
+
+// ---- Vehicle geometry helpers -------------------------------------------
+// Every dynamic body that makes up the vehicle, guarded so a partially-built or
+// frozen car doesn't throw. (Car.bodies() is the un-guarded fast path used where
+// the car is known-complete; this defensive version backs the readout cheats.)
+export function _vehicleBodies(car) {
+  var bodies = [];
+  if (!car) return bodies;
+  if (car.chassisBody) bodies.push(car.chassisBody);
+  if (car.wheels) for (var wi = 0; wi < car.wheels.length; wi++) {
+    var w = car.wheels[wi]; if (!w) continue;
+    if (w.body) bodies.push(w.body);
+    if (w.rimBody) bodies.push(w.rimBody);
+  }
+  if (car.person) {
+    if (car.person.torso && car.person.torso.body) bodies.push(car.person.torso.body);
+    if (car.person.head && car.person.head.body) bodies.push(car.person.head.body);
+  }
+  return bodies;
+}
+// Whole-vehicle center of mass in world meters (mass-weighted mean of every body's
+// own CoM). A fixed point in the vehicle frame, so unlike the chassis origin it does
+// NOT orbit/wobble as the car spins — the right anchor for the readouts.
+export function _vehicleCoM(car) {
+  var bodies = _vehicleBodies(car), mx = 0, my = 0, mtot = 0;
+  for (var i = 0; i < bodies.length; i++) {
+    var m = bodies[i].GetMass(); if (!(m > 0)) continue;
+    var c = bodies[i].GetWorldCenter();
+    mx += m * c.x; my += m * c.y; mtot += m;
+  }
+  if (mtot <= 0) { var p = car.chassisBody.GetPosition(); return { x: p.x, y: p.y }; }
+  return { x: mx / mtot, y: my / mtot };
+}
+// Snapshot a car's draw pose (meters) + whole-vehicle CoM for the ghost replay.
+export function capturePose(car) {
+  function wp(b) { var q = b.GetPosition(); return { x: q.x, y: q.y, angle: b.GetAngle() }; }
+  return { chassis: wp(car.chassisBody),
+           wheels: [wp(car.wheels[0].body), wp(car.wheels[1].body)],
+           torso: wp(car.person.torso.body), head: wp(car.person.head.body),
+           com: _vehicleCoM(car),   // whole-vehicle CoM so replay readouts don't wobble
+           dead: !!car.player.kindaDead };
+}
+
+// ---- Contact listener ----------------------------------------------------
+export function makeContactListener(w) {
+  var L = new Box2D.Dynamics.b2ContactListener;
+  L.BeginContact = function(contact) {
+    var udA = contact.GetFixtureA().GetBody().GetUserData();
+    var udB = contact.GetFixtureB().GetBody().GetUserData();
+    if (!udA || !udB) return;
+
+    function killViaHead(headBody) {
+      if (S.bpInvincible) return;   // bug probe: don't split the car / kill on head-ground contact
+      if (headBody.GetJointList() == null) return;
+      var c = headBody.GetJointList().other.GetJointList().other.GetUserData();
+      if (!c) return;
+      try { w.DestroyJoint(c.distJoint); } catch(e) {}
+      try { w.DestroyJoint(c.person.distJoint); } catch(e) {}
+      try { w.DestroyJoint(c.revJoint); } catch(e) {}
+      try { w.DestroyJoint(c.person.headJoint); } catch(e) {}
+      if (c.player) c.player.kindaDead = true;
+    }
+    if (udA.id == "head" && udB.id == "ground") killViaHead(contact.GetFixtureA().GetBody());
+    if (udB.id == "head" && udA.id == "ground") killViaHead(contact.GetFixtureB().GetBody());
+    if (udA.id == "wheel" && udB.id == "ground") udA.onGround = true;
+    if (udB.id == "wheel" && udA.id == "ground") udB.onGround = true;
+  };
+  L.EndContact = function(contact) {
+    var udA = contact.GetFixtureA().GetBody().GetUserData();
+    var udB = contact.GetFixtureB().GetBody().GetUserData();
+    if (!udA || !udB) return;
+    if (udA.id == "wheel" && udB.id == "ground") udA.onGround = false;
+    if (udB.id == "wheel" && udA.id == "ground") udB.onGround = false;
+  };
+  w.SetContactListener(L);
+  return L;
+}
+
+// ---- Players -------------------------------------------------------------
+export function makePlayer(agent, color, xOffsetPx, yOffsetPx) {
+  // xOffsetPx / yOffsetPx perturb spawn position in pixel units. Used by Best of X
+  // to exploit Box2D's chaotic divergence: sub-pixel offsets are visually
+  // imperceptible but amplify over seconds into very different trajectories, so X
+  // attempts of a deterministic policy produce X different runs without stochastic
+  // action sampling.
+  var dx = xOffsetPx || 0;
+  var dy = yOffsetPx || 0;
+  var dummyPlayer = { shirtColorR: color.shirtR, shirtColorG: color.shirtG, shirtColorB: color.shirtB,
+                      dead: false, kindaDead: false };
+  var car = new Car(SPAWN_X + dx, getSpawningY() + dy, S.world, dummyPlayer);
+  if (agent) agent.reset();   // clear any per-episode AI state
+  return {
+    car: car,
+    agent: agent,             // null = human; otherwise an Agent (see ai_policy.js)
+    isAI: agent !== null,
+    color: color,
+    maxDistPx: car.chassisBody.GetPosition().x * SCALE,
+    dead: false,
+    // No-progress timeout state (AI only). Counter ticks up each step and resets
+    // each time the car crosses a 50-px milestone. Matches python/env.py:244 — the
+    // agent was trained against this gate. Humans aren't timed out.
+    stuckCount: 0,
+    // Tick at which this car first passed the finish (0 = hasn't beaten the game).
+    // Human-vs-Human uses it to award the win to whoever beat the game first.
+    beatTick: 0,
+  };
+}
+
+// Freeze a car in place: make every body static so it holds its final pose instead
+// of continuing to fall. Used ONLY when a car falls off the edge of the world —
+// otherwise the camera chases it into the void and the screen fills with the
+// (infinitely-tall) brown dirt polygon. The world itself can't stop (an opponent may
+// still be racing in vs/hvh), so we stop just the fallen car.
+export function freezeCar(car) {
+  var bs = car.bodies();
+  for (var i = 0; i < bs.length; i++) {
+    try { bs[i].SetType(b2StaticBody); } catch (e) {}
+  }
+}
+
+// One-place end-of-step bookkeeping shared by the live RAF loop and the Best of X
+// headless loop. Updates max-distance + stuck counter, applies the head/fell-off
+// death checks and the AI no-progress timeout. Returns true iff the player just died.
+export function _checkPlayerEndOfStep(p) {
+  if (p.dead) return false;
+  var pos = p.car.chassisBody.GetPosition();
+  var xpx = pos.x * SCALE;
+  var ypx = pos.y * SCALE;
+  p.stuckCount += 1;
+  if (xpx > p.maxDistPx) {
+    p.maxDistPx = xpx;
+    // Reset on each 50-px milestone — same trigger as training (int(max_dist_px) %
+    // 50 == 0). Math.floor matches Python's int() for positive values.
+    if (Math.floor(p.maxDistPx) % 50 === 0) p.stuckCount = 0;
+  }
+  // Record the first step this car reaches the finish = the last solid terrain vertex
+  // (distance - smoothness; the launch lip) — the same line as "completion" and what
+  // the backtrack search calls "beating the game". Human-vs-Human awards the win to
+  // whoever crosses FIRST (smallest beatTick).
+  if (!p.beatTick && S.ground && p.maxDistPx >= S.ground.distance - S.ground.smoothness) p.beatTick = S.tickCount;
+  var fellOffWorld = !S.bpInvincible && isBelowKillLine(ypx);   // fell below the screen into the void
+  if (!S.bpInvincible && (p.car.player.kindaDead || isBelowKillLine(ypx))) p.dead = true;
+  if (p.isAI && !S.bpInvincible && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
+  // Freeze ONLY on a fall-off-the-world death: head-hit ragdolls stay on-screen and
+  // are fine to keep tumbling, but a car that dropped off the edge would fall forever
+  // and the camera would fill the screen with brown dirt. Inert in the backtrack
+  // search/replay (btRoll returns on death and rebuilds; jsReplaySegments doesn't call this).
+  if (p.dead && fellOffWorld) freezeCar(p.car);
+  return p.dead;
+}
+
+// ---- Terrain generation --------------------------------------------------
+// Generate a playable map: roll noise + randomize, rerolling until isTooSteep()
+// accepts it — matching the real game (sketch.js:234), which loops UNBOUNDED. The
+// gate rejects ~97% of raw maps (~33 rerolls avg), so it defines the game's terrain
+// distribution. The 1000-cap is only a hang guard (P(hit) ~ 0.97^1000 ~ 1e-13).
+// Returns the Ground (no world bodies built yet) and the global spawningY that
+// randomizeGround() set. Pulling this out of buildWithGround lets Best of X generate
+// ONE map and clone it into X separate worlds.
+export function rollAcceptableGround() {
+  var tmp = new b2World(new Vec2(0, 10), false);
+  perlinSeed(Math.floor(Math.random() * 0x7FFFFFFF));
+  var g = new Ground(tmp);
+  g.randomizeGround();
+  var rerolls = 0;
+  while (g.isTooSteep() && rerolls < 1000) {
+    perlinSeed(Math.floor(Math.random() * 0x7FFFFFFF));
+    g = new Ground(tmp);
+    g.randomizeGround();
+    rerolls += 1;
+  }
+  return { ground: g, spawningY: getSpawningY() };
+}
+
+// Build the players the current mode wants (see modes.MODES). Best of X passes a
+// sub-pixel spawn jitter, applied to the (single) AI player.
+function spawnPlayers(spawnDx, spawnDy) {
+  var defs = modeDef(S.mode).spawn;
+  var out = [];
+  for (var i = 0; i < defs.length; i++) {
+    var d = defs[i];
+    var agent = (d.agent === "ai") ? S.aiAgent : null;
+    var dx = (d.agent === "ai") ? (spawnDx || 0) : 0;
+    var dy = (d.agent === "ai") ? (spawnDy || 0) : 0;
+    var p = makePlayer(agent, spawnColor(d), dx, dy);
+    if (d.control) p.control = d.control;
+    out.push(p);
+  }
+  return out;
+}
+
+// Build a fresh world with the players a given mode wants. If `sourceGround` is
+// non-null, clones its vectors/grass instead of generating new terrain — used both
+// for Best of X attempts and for replaying a recorded run. spawnDx/spawnDy perturb
+// the AI spawn in pixels (Best of X only).
+export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
+  S.worldGen += 1;  // invalidates any in-flight runOneStep awaiting from the old world
+  S.bpZeroG = false;  // fresh world has normal gravity; clear any stale float state
+  S.world = new b2World(new Vec2(0, 10), false);
+  S.listener = makeContactListener(S.world);
+  if (sourceGround) {
+    setSpawningY(sourceSpawningY);
+    S.ground = new Ground(S.world);
+    S.ground.cloneFrom(sourceGround);
+    S.ground.setBodies(S.world);
+  } else {
+    var roll = rollAcceptableGround();
+    setSpawningY(roll.spawningY);
+    S.ground = new Ground(S.world);
+    S.ground.cloneFrom(roll.ground);
+    S.ground.setBodies(S.world);
+    recordSessionTerrain();   // remember this fresh map for the Terrains dropdown
+  }
+
+  S.players = spawnPlayers(spawnDx, spawnDy);
+
+  S.tickCount = 0;
+  S.cameraPanX = 0;
+  S.cameraPanY = 0;
+  S.cam0.panX = S.cam0.panY = 0;
+  S.camL.panX = S.camL.panY = 0;
+  S.camR.panX = S.camR.panY = 0;
+  S.accumSec = 0;
+  S.lastWallMs = 0;
+  bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars
+  // Keep Zero-G in sync with its checkbox across rebuilds. The fresh world has normal
+  // gravity (bpZeroG reset to false), so if the user left Zero-G ticked, re-apply it.
+  // bpSetZeroG recaptures the fresh world's real gravity on entry, so bpSavedGravity
+  // stays correct.
+  var _zg = document.getElementById("bp_zerog");
+  if (_zg && _zg.checked) bpSetZeroG(true);
+}
+
+export function buildSimulation() {
+  // Default path used by Reset / mode switch. Generates a fresh map — UNLESS a track
+  // has been loaded, in which case we rebuild that exact pinned track. (Reset clears
+  // loadedTrack first, so only a Mode switch keeps the pinned track.) Any normal
+  // (re)build exits ghost-replay mode.
+  S.replayActions = null;
+  S.ghostPoses = null; S.ghostDone = false;
+  if (S.loadedTrack) {
+    buildWithGround(makeSourceFromTrack(S.loadedTrack), S.loadedTrack.spawning_y, 0, 0);
+  } else {
+    buildWithGround(null, 0);
+  }
+}
+
+// Build a Ground.cloneFrom() source from a Python-exported pinned track. Vertices
+// arrive in PIXELS (incl. the 2 closing verts); Ground stores meters, so divide by
+// SCALE. grassPositions are cosmetic (2 per vertex) — -1 = no sprite.
+export function makeSourceFromTrack(track) {
+  var verts = [];
+  for (var i = 0; i < track.vertices.length; i++) {
+    verts.push(new Vec2(track.vertices[i][0] / SCALE, track.vertices[i][1] / SCALE));
+  }
+  var grass = [];
+  for (var i = 0; i < verts.length; i++) { grass.push(-1); grass.push(-1); }
+  return { vectors: verts, grassPositions: grass };
+}
+
+// Build a source (cloned vectors + grass) from the CURRENT live terrain, so we can
+// rebuild the world on the SAME map (Restart) without generating a new one.
+export function currentGroundSource() {
+  return { vectors: S.ground.vectors.map(function(v) { return new Vec2(v.x, v.y); }),
+           grassPositions: S.ground.grassPositions.slice() };
+}
+
+// ---- Session terrains ----------------------------------------------------
+// Remember every fresh map generated this session so the user can re-load one from
+// the Terrains dropdown. Stored as loadedTrack-compatible objects (vertices in px)
+// so re-loading reuses the normal pinned-track path. Capped so a long session can't
+// grow huge.
+export function recordSessionTerrain() {
+  if (!S.ground || !S.ground.vectors) return;
+  S.terrainCounter += 1;
+  S.sessionTerrains.push({
+    id: S.terrainCounter,
+    name: "Terrain " + S.terrainCounter,
+    vertices: S.ground.vectors.map(function(v) { return [v.x * SCALE, v.y * SCALE]; }),
+    spawning_y: getSpawningY(),
+  });
+  if (S.sessionTerrains.length > MAX_SESSION_TERRAINS) S.sessionTerrains.shift();
+  _populateTerrainSelect();
+}
+export function _populateTerrainSelect() {
+  var sel = document.getElementById("terrain_select");
+  if (!sel) return;
+  sel.innerHTML = "";
+  var ph = document.createElement("option");
+  ph.value = ""; ph.textContent = "— past terrains (" + S.sessionTerrains.length + ") —";
+  sel.appendChild(ph);
+  for (var i = S.sessionTerrains.length - 1; i >= 0; i--) {   // newest first
+    var t = S.sessionTerrains[i];
+    var opt = document.createElement("option");
+    opt.value = String(t.id);
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+}
+
+// ---- Actions + the per-tick step ----------------------------------------
+export function applyAction(car, action) {
+  if (action === 0) car.motorOn(true);
+  else if (action === 1) car.motorOn(false);
+  else car.motorOff();
+}
+
+export async function runOneStep() {
+  // Ghost replay: advance the recorded pose stream one frame; NO physics step.
+  // simSpeed/pause still apply (driven by the loop's accumulator). Returns true
+  // (==all done) at the last frame so the loop stops and holds the final frame.
+  if (S.ghostPoses !== null) {
+    S.ghostIdx += 1;
+    if (S.ghostIdx >= S.ghostPoses.length - 1) { S.ghostIdx = S.ghostPoses.length - 1; S.ghostDone = true; return true; }
+    return false;
+  }
+  // One physics tick + one action poll per living player + Box2D step.
+  if (S.players.length === 0) return false;
+  // Capture the generation at entry. If buildWithGround runs during an await below,
+  // the post-await check returns early so we don't apply a stale action against a
+  // freshly-built world (see S.worldGen).
+  var gen = S.worldGen;
+
+  for (var pi = 0; pi < S.players.length; pi++) {
+    var p = S.players[pi];
+    if (p.dead) continue;
+    var action;
+    if (S.replayActions !== null && p.agent) {
+      // Replay mode: read pre-recorded action. Past the end -> motor off (the car was
+      // already dying when recording stopped).
+      action = (S.replayIdx < S.replayActions.length) ? S.replayActions[S.replayIdx] : 2;
+    } else if (p.agent) {
+      // Hand the agent a minimal sim context — it decides what obs to build. Adding a
+      // new agent type with different obs needs only requires extending this object.
+      action = await p.agent.act({
+        car: p.car,
+        ground: S.ground,
+        scale: SCALE,
+      });
+      if (gen !== S.worldGen) return true;  // world replaced mid-await; abort
+    } else {
+      // Human: route the correct control set. hvh tags players with .control
+      // (left=WASD, right=arrows); every other mode's lone human accepts EITHER.
+      action = (p.control === "wasd")   ? humanActionWASD()
+             : (p.control === "arrows") ? humanAction()
+             :                            humanActionAny();
+    }
+    applyAction(p.car, action);
+  }
+  if (S.replayActions !== null) S.replayIdx += 1;
+  bpApplyMotorOverride();   // bug probe: re-apply scaled motor speed/torque before the step
+  applyFlyCheats();         // cheat: WASD/arrow Flight (constant vel) or Rocket (thrust)
+
+  S.world.Step(1.0 / FRAME_RATE, 10, 10);
+  S.world.ClearForces();
+  S.tickCount += 1;
+  recordTick();   // bug probe: log human-car state this tick (no-op if no human)
+
+  var allDead = true;
+  for (var pi = 0; pi < S.players.length; pi++) {
+    var p = S.players[pi];
+    if (p.dead) continue;
+    _checkPlayerEndOfStep(p);
+    if (!p.dead) allDead = false;
+  }
+  return allDead;
+}
