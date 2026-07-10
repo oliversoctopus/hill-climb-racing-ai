@@ -33,7 +33,9 @@ export const HUMAN_R_COLOR = { outline: "#6f6", torso: "#2f8f2f", shirtR: 90, sh
 
 // --- Cheat / bug-probe tuning ---
 export const BP_MAX_LEN = 12000;   // ring-buffer cap (~6.7 min at 30 fps)
-export const FLIGHT_SPEED_MIN = 0, FLIGHT_SPEED_MAX = 60, FLIGHT_SPEED_STEP = 5;
+export const FLIGHT_SPEED_MIN = 0, FLIGHT_SPEED_MAX = 300;
+// Scroll increments: FLIGHT_SPEED_STEP up to FLIGHT_SPEED_STEP_BREAK, then _HI beyond it.
+export const FLIGHT_SPEED_STEP = 5, FLIGHT_SPEED_STEP_HI = 10, FLIGHT_SPEED_STEP_BREAK = 100;
 export const FLIGHT_ROT_RATE = 2.0;   // spin rate (rad/s) while rotate held
 export const FLIGHT_ROT_DAMP = 0.90;  // per-tick angular damping when NOT rotating
 export const ROCKET_ACCEL_MIN = 5, ROCKET_ACCEL_MAX = 120, ROCKET_ACCEL_STEP = 5;
@@ -98,6 +100,7 @@ export const S = {
   bpInvincible: false,    // skip head-ground / fell-off / no-progress death
   bpAltimeter: false,     // live height-above-ground readout
   bpSpeed: false,         // live speed readout
+  bpDistance: false,      // live current-position score readout, under the player score (C)
   bpFlight: false,        // constant-velocity hover cheat (G)
   bpRocket: false,        // thrust cheat (J)
   flightSpeed: 20,        // m/s, scroll-adjustable

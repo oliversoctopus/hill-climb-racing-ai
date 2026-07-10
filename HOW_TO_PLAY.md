@@ -70,7 +70,8 @@ Other buttons:
 
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
 **Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** velocity,
-**R** Restart (same terrain), **T** Regenerate terrain, **P** Pause/Resume,
+**C** distance (current-position score), **R** Restart (same terrain), **T** Regenerate
+terrain, **P** Pause/Resume,
 **Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
 of X), **Esc** close the cheat sheet.
 
@@ -106,9 +107,9 @@ Regenerate terrain** re-rolls the shared map and clears old runs.
 
 ## 7. Bug probe (debug panel)
 
-Below the main controls is an **ℹ️ Info** row (Altimeter, Velocity — read-only
-readouts, not cheats), a **✨ Cheats** row, and a **🐞 Bug probe** panel. The
-**info readouts and cheats** — Altimeter, Velocity, Invincible, Zero-G + Float,
+Below the main controls is an **ℹ️ Info** row (Altimeter, Velocity, Distance —
+read-only readouts, not cheats), a **✨ Cheats** row, and a **🐞 Bug probe** panel. The
+**info readouts and cheats** — Altimeter, Velocity, Distance, Invincible, Zero-G + Float,
 and the physics/motor knobs — apply to **every car on screen, the AI included, in
 all modes** (even AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
 for *recording* use **Mode: Human only**. Nothing here persists or touches the
@@ -135,6 +136,9 @@ are unaffected (no retrain implied).
   center-of-mass velocity, so spinning or flipping doesn't inflate it. They sit
   top-center; when both are on, altitude is on top and speed just below. In
   Human-vs-Human split mode each screen shows its own player's meters.
+- **Distance (C):** your **current-position** score, drawn just under the player's
+  score. The score is your best (high-water mark); Distance is where you are *now*,
+  so it drops if you roll backward. Shown under each player's score in every mode.
 - **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
 - **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
   the active physics knobs) for offline analysis.

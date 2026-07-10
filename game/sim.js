@@ -17,6 +17,12 @@ import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZer
 // and Code Bullet's Player.js. `scorePx` takes a raw x in px; `scoreOf` a player.
 export function scorePx(px) { return Math.max(0, Math.floor((px - SPAWN_X) / 10)); }
 export function scoreOf(p) { return scorePx(p.maxDistPx); }
+// Current-position score: like scoreOf but from the car's CURRENT x, not its high-water
+// mark (p.maxDistPx) — so it drops when the car rolls back. Falls back to the stored max.
+export function curScoreOf(p) {
+  if (p && p.car && p.car.chassisBody) return scorePx(p.car.chassisBody.GetPosition().x * SCALE);
+  return scoreOf(p);
+}
 
 // ---- Vehicle geometry helpers -------------------------------------------
 // Every dynamic body that makes up the vehicle, guarded so a partially-built or

@@ -95,8 +95,8 @@ export function _handleActionKey(e) {
   if (k === "escape") { document.getElementById("keybinds_panel").style.display = "none"; return; }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
   const map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", h: "bp_altimeter",
-              v: "bp_speed", g: "bp_flight", j: "bp_rocket", r: "reset_pos",
-              t: "reset", p: "pause" };
+              v: "bp_speed", c: "bp_distance", g: "bp_flight", j: "bp_rocket",
+              r: "reset_pos", t: "reset", p: "pause" };
   const id = map[k];
   if (!id) return;
   const el = document.getElementById(id);

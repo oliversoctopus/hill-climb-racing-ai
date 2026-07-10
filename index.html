@@ -63,7 +63,8 @@
     <tr><td><b>F</b></td><td>Float car up</td></tr>
     <tr><td><b>H</b></td><td>Altimeter (toggle altitude readout)</td></tr>
     <tr><td><b>V</b></td><td>Velocity (toggle speed readout)</td></tr>
-    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed (0–60); release fwd/back to stop dead</td></tr>
+    <tr><td><b>C</b></td><td>Distance (toggle current-position score, under the player's score)</td></tr>
+    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
     <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
     <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
     <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
@@ -85,13 +86,14 @@
   ℹ️ Info:
   <label style="margin-right:8px;"><input type="checkbox" id="bp_altimeter" title="Show a live altitude readout — the car's height above a fixed level (the fall-off line at the bottom of the screen), in meters (H)"> Altimeter</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_speed" title="Show a live velocity readout — the whole-vehicle speed in m/s (V)"> Velocity</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_distance" title="Show your CURRENT-position score under the player's score — unlike the score (your best), this drops if you roll backward (C)"> Distance</label>
 </div>
 <div id="cheats_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px;">
   ✨ Cheats:
   <label style="margin-right:8px;"><input type="checkbox" id="bp_invince"> Invincible</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_zerog" title="Toggle gravity off/on — everything keeps its velocity (Z)"> Zero-G</label>
   <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–60 (G)"> Flight</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
 </div>

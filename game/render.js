@@ -6,7 +6,7 @@ import {
   S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE,
   AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
 } from "./state.js";
-import { scoreOf, scorePx, _vehicleBodies, _vehicleCoM } from "./sim.js";
+import { scoreOf, scorePx, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
 
@@ -230,6 +230,13 @@ function _hudText(ctx, text, x, y, align, color, size) {
   ctx.restore();
 }
 
+// Distance (info readout): the CURRENT-position score, drawn just under a score label at
+// (x, y) when the toggle is on. Smaller than the score so it reads as a sub-line.
+function _drawDistanceUnder(ctx, curScore, x, y, align, color) {
+  if (!S.bpDistance) return;
+  _hudText(ctx, `Distance ${curScore}`, x, y + 26, align, color, 18);
+}
+
 // Live-play score HUD for the single-screen modes: your score top-left, and the AI's
 // top-right when racing it (mirrors the Human-vs-AI layout in sketch.js).
 function _drawSingleScoreHUD(ctx) {
@@ -237,11 +244,15 @@ function _drawSingleScoreHUD(ctx) {
   for (let i = 0; i < S.players.length; i++) { if (S.players[i].isAI) ai = S.players[i]; else hum = S.players[i]; }
   if (S.mode === "vs" && hum && ai) {
     _hudText(ctx, `You — Score ${scoreOf(hum)}`, 24, 48, "left",  HUMAN_COLOR.outline);
+    _drawDistanceUnder(ctx, curScoreOf(hum), 24, 48, "left", HUMAN_COLOR.outline);
     _hudText(ctx, `AI — Score ${scoreOf(ai)}`,  CANVAS_WIDTH - 24, 48, "right", AI_COLOR.outline);
+    _drawDistanceUnder(ctx, curScoreOf(ai), CANVAS_WIDTH - 24, 48, "right", AI_COLOR.outline);
   } else if (S.mode === "human" && hum) {
     _hudText(ctx, `Your Score: ${scoreOf(hum)}`, 24, 48, "left", HUMAN_COLOR.outline);
+    _drawDistanceUnder(ctx, curScoreOf(hum), 24, 48, "left", HUMAN_COLOR.outline);
   } else if ((S.mode === "ai" || S.mode === "bestofx") && ai) {
     _hudText(ctx, `AI Score: ${scoreOf(ai)}`, 24, 48, "left", AI_COLOR.outline);
+    _drawDistanceUnder(ctx, curScoreOf(ai), 24, 48, "left", AI_COLOR.outline);
   }
 }
 
@@ -449,7 +460,9 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
 
   // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
   _hudText(ctx, `${ownName} — Score ${scoreOf(ownP)}`, 24, 48, "left",  ownColor.outline);
+  _drawDistanceUnder(ctx, curScoreOf(ownP), 24, 48, "left", ownColor.outline);
   _hudText(ctx, `${oppName} — Score ${scoreOf(oppP)}`, viewWidth - 24, 48, "right", oppColor.outline);
+  _drawDistanceUnder(ctx, curScoreOf(oppP), viewWidth - 24, 48, "right", oppColor.outline);
   // Center readout cheats for THIS player's car — top-center at y=48, identical to
   // every other mode.
   drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 48);

@@ -3,7 +3,7 @@
 // and the requestAnimationFrame loop; the concern modules it imports do the work.
 import {
   S, CANVAS_HEIGHT, SIM_DT,
-  FLIGHT_SPEED_MIN, FLIGHT_SPEED_MAX, FLIGHT_SPEED_STEP,
+  FLIGHT_SPEED_MIN, FLIGHT_SPEED_MAX, FLIGHT_SPEED_STEP, FLIGHT_SPEED_STEP_HI, FLIGHT_SPEED_STEP_BREAK,
   ROCKET_ACCEL_MIN, ROCKET_ACCEL_MAX, ROCKET_ACCEL_STEP,
 } from "./state.js";
 import { AiPolicy, setGrassSprites, getSpawningY } from "./bridge.js";
@@ -222,13 +222,18 @@ document.getElementById("bp_speed").onchange = function() {
   bpSetStatus(S.bpSpeed ? "Speed meter ON — chassis velocity (m/s) shown on screen."
                         : "Speed meter OFF.");
 };
+document.getElementById("bp_distance").onchange = function() {
+  S.bpDistance = this.checked;
+  bpSetStatus(S.bpDistance ? "Distance ON — your CURRENT-position score shown under the score (drops if you roll back)."
+                           : "Distance OFF.");
+};
 document.getElementById("bp_flight").onchange = function() {
   S.bpFlight = this.checked;
   if (S.bpFlight && S.bpRocket) {   // mutually exclusive — they share the same keys
     S.bpRocket = false; document.getElementById("bp_rocket").checked = false;
   }
   bpSetStatus(S.bpFlight
-    ? `Flight mode ON — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release forward/back to stop dead in the air. Speed ${S.flightSpeed} m/s; scroll wheel to adjust (0–60). Tip: Invincible survives crashes.`
+    ? `Flight mode ON — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release forward/back to stop dead in the air. Speed ${S.flightSpeed} m/s; scroll wheel to adjust (0–300). Tip: Invincible survives crashes.`
     : "Flight mode OFF.");
 };
 document.getElementById("bp_rocket").onchange = function() {
@@ -241,12 +246,17 @@ document.getElementById("bp_rocket").onchange = function() {
     : "Rocket mode OFF.");
 };
 // Scroll wheel over the canvas adjusts whichever fly cheat is active: Flight speed
-// (0–60) or Rocket thrust. passive:false so we can preventDefault the page scroll.
+// (0–300) or Rocket thrust. passive:false so we can preventDefault the page scroll.
 document.getElementById("stage").addEventListener("wheel", e => {
   if (S.bpFlight) {
     e.preventDefault();
-    const d = (e.deltaY < 0 ? 1 : -1) * FLIGHT_SPEED_STEP;
-    S.flightSpeed = Math.max(FLIGHT_SPEED_MIN, Math.min(FLIGHT_SPEED_MAX, S.flightSpeed + d));
+    const up = e.deltaY < 0;
+    // Increments of FLIGHT_SPEED_STEP up to the break, FLIGHT_SPEED_STEP_HI past it.
+    // Going up uses the band you're entering; going down the band you're leaving, so the
+    // grid stays clean (…95, 100, 110, 120…) around the break.
+    const step = up ? (S.flightSpeed >= FLIGHT_SPEED_STEP_BREAK ? FLIGHT_SPEED_STEP_HI : FLIGHT_SPEED_STEP)
+                    : (S.flightSpeed >  FLIGHT_SPEED_STEP_BREAK ? FLIGHT_SPEED_STEP_HI : FLIGHT_SPEED_STEP);
+    S.flightSpeed = Math.max(FLIGHT_SPEED_MIN, Math.min(FLIGHT_SPEED_MAX, S.flightSpeed + (up ? step : -step)));
     bpSetStatus(`Flight speed ${S.flightSpeed} m/s  (scroll up = faster, down = slower; ${FLIGHT_SPEED_MIN}–${FLIGHT_SPEED_MAX})`);
   } else if (S.bpRocket) {
     e.preventDefault();
