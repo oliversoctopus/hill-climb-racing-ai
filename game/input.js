@@ -62,6 +62,30 @@ export function _handleGameKey(e, down) {
   }
 }
 
+// Alt+1..5 jump straight to a mode (in the <select>'s option order: 1 AI only,
+// 2 Human only, 3 Human vs AI, 4 Human vs Human, 5 Best of X). We require Alt so a
+// BARE digit never switches modes — that keeps typing numbers into a field safe AND
+// stops a stray keystroke (typing with no field focused) from walking through modes;
+// Alt+digit also inserts no text, so it's safe to fire regardless of what's focused.
+// We just drive the dropdown (set + dispatch change) so ALL the existing mode-switch
+// logic runs once, instead of duplicating it. Returns true if it consumed the event.
+// Uses e.code (Digit1/Numpad1…) so it's layout-independent — some layouts map Alt+1
+// to a symbol in e.key. Returns true (swallowing the event) for any Alt+[1-5].
+export function _handleModeKey(e) {
+  if (!e.altKey) return false;
+  const m = /^(?:Digit|Numpad)([1-5])$/.exec(e.code);
+  if (!m) return false;
+  e.preventDefault();
+  if (e.repeat) return true;   // holding Alt+1 must not rebuild the sim every repeat
+  const idx = parseInt(m[1], 10) - 1;
+  const sel = document.getElementById("mode");
+  if (sel && idx < sel.options.length && sel.selectedIndex !== idx) {
+    sel.selectedIndex = idx;
+    sel.dispatchEvent(new Event("change"));   // runs mode.onchange (rebuild, resize, refocus)
+  }
+  return true;
+}
+
 // Single-key action shortcuts (fire once on keydown, never while typing in a field).
 // Each just clicks its button/checkbox, so it inherits that control's behavior AND its
 // disabled state (e.g. Restart is a no-op during a backtrack search).

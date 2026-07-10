@@ -14,7 +14,7 @@ import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpFlag, bpDownload, bpApplyPhys, _bpNum,
 } from "./cheats.js";
-import { focusGame, _handleGameKey, _handleActionKey } from "./input.js";
+import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 
 export function setStatus(s) { document.getElementById("status").textContent = s; }
 
@@ -306,7 +306,7 @@ document.getElementById("keybinds_close").onclick = () => {
 };
 
 // Keyboard + focus
-window.addEventListener("keydown", e => { _handleGameKey(e, true); _handleActionKey(e); });
+window.addEventListener("keydown", e => { if (_handleModeKey(e)) return; _handleGameKey(e, true); _handleActionKey(e); });
 window.addEventListener("keyup",   e => { _handleGameKey(e, false); });
 document.getElementById("stage").addEventListener("mousedown", focusGame);
 

@@ -71,7 +71,8 @@ Other buttons:
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
 **Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** velocity,
 **R** Restart (same terrain), **T** Regenerate terrain, **P** Pause/Resume,
-**Esc** close the cheat sheet.
+**Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
+of X), **Esc** close the cheat sheet.
 
 ## 5. Racing the AI (Human vs AI mode)
 
