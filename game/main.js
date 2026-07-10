@@ -214,7 +214,7 @@ document.getElementById("bp_invince").onchange = function() {
 document.getElementById("bp_zerog").onchange   = function() { bpSetZeroG(this.checked); };
 document.getElementById("bp_altimeter").onchange = function() {
   S.bpAltimeter = this.checked;
-  bpSetStatus(S.bpAltimeter ? "Altimeter ON — height above the ground shown on screen."
+  bpSetStatus(S.bpAltimeter ? "Altimeter ON — altitude above the fall-off line (a fixed level) shown on screen."
                             : "Altimeter OFF.");
 };
 document.getElementById("bp_speed").onchange = function() {

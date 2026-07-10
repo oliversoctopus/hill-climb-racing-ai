@@ -8,7 +8,7 @@ import {
 } from "./state.js";
 import { scoreOf, scorePx, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
-import { altitudeAbove } from "./geom.js";
+import { altitudeAboveKillLine } from "./geom.js";
 
 // Draws a body's sprite at its world position, rotated by its angle. The sprite-rect
 // (sx, sy, sw, sh) is in body-LOCAL pixel space (relative to the body's center,
@@ -246,13 +246,13 @@ function _drawSingleScoreHUD(ctx) {
 }
 
 // ---- Readout cheats (altimeter, speed) ----------------------------------
-// Altimeter (cheat): height of the chassis above the ground line directly below it,
-// in meters (y-down; see geom.altitudeAbove). Uses getPositions(x,1,1).
+// Altimeter (info readout): the chassis's ABSOLUTE elevation above the fixed kill-line
+// level, in meters (y-down; see geom.altitudeAboveKillLine) — a constant reference, not
+// the clearance over the hill directly below, so it reads true height along the track.
 function _altitudeMeters(car) {
-  if (!car || !S.ground || !S.ground.vectors || !S.ground.vectors.length) return 0;
+  if (!car) return 0;
   const p = car.chassisBody.GetPosition();
-  const g = S.ground.getPositions(p.x, 1, 1);
-  return altitudeAbove(g[0], p.y);
+  return altitudeAboveKillLine(p.y);
 }
 // Speed meter (cheat): the WHOLE-VEHICLE center-of-mass velocity in m/s (mass-weighted
 // mean of every body's CoM velocity). The chassis CoM orbits the vehicle CoM while the
@@ -277,14 +277,14 @@ function _speedComponents(car) {
 
 // Ghost-replay data sources for the readout cheats. A ghost is a recorded pose stream
 // (no live bodies), so both readouts anchor on the recorded WHOLE-VEHICLE CoM (pose.com),
-// NOT the chassis origin, so they don't wobble. Altitude = ground below the CoM; speed =
-// finite-difference of the CoM across neighbouring frames. Older poses fall back to chassis.
+// NOT the chassis origin, so they don't wobble. Altitude = elevation above the fixed
+// kill-line level; speed = finite-difference of the CoM across neighbouring frames.
+// Older poses fall back to chassis.
 function _ghostRef(pose) { return (pose && pose.com) ? pose.com : (pose ? pose.chassis : null); }
 function _ghostAltitudeMeters(pose) {
   const r = _ghostRef(pose);
-  if (!r || !S.ground || !S.ground.getPositions) return 0;
-  const g = S.ground.getPositions(r.x, 1, 1);
-  return altitudeAbove(g[0], r.y);
+  if (!r) return 0;
+  return altitudeAboveKillLine(r.y);
 }
 function _ghostSpeedComponents(idx) {
   if (!S.ghostPoses || S.ghostPoses.length < 2) return { h: 0, v: 0, total: 0 };

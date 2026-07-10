@@ -69,8 +69,8 @@ Other buttons:
   found. "Replaying run…" appears next to the button while the replay plays.
 
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
-**Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** speed
-meter, **R** Restart (same terrain), **T** Regenerate terrain, **P** Pause/Resume,
+**Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** velocity,
+**R** Restart (same terrain), **T** Regenerate terrain, **P** Pause/Resume,
 **Esc** close the cheat sheet.
 
 ## 5. Racing the AI (Human vs AI mode)
@@ -105,10 +105,11 @@ Regenerate terrain** re-rolls the shared map and clears old runs.
 
 ## 7. Bug probe (debug panel)
 
-Below the main controls is a **✨ Cheats** row and a **🐞 Bug probe** panel. The
-**cheats** — Invincible, Zero-G + Float, Altimeter, Speed, and the physics/motor
-knobs — apply to **every car on screen, the AI included, in all modes** (even
-AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
+Below the main controls is an **ℹ️ Info** row (Altimeter, Velocity — read-only
+readouts, not cheats), a **✨ Cheats** row, and a **🐞 Bug probe** panel. The
+**info readouts and cheats** — Altimeter, Velocity, Invincible, Zero-G + Float,
+and the physics/motor knobs — apply to **every car on screen, the AI included, in
+all modes** (even AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
 for *recording* use **Mode: Human only**. Nothing here persists or touches the
 source physics — it's all runtime, so AI/browser parity and the deployed model
 are unaffected (no retrain implied).
@@ -125,9 +126,11 @@ are unaffected (no retrain implied).
   going). With no gravity and no ground, any spin that grows is a pure
   joint/solver artifact. The camera follows the car vertically as it drifts.
   Pressing **Zero-G** again restores gravity.
-- **Altimeter (H) / Speed meter (V):** on-screen readouts for the focused car —
-  height above the ground (m) and speed as **H**orizontal / **V**ertical / **Tot**al
-  (m/s; vertical is positive upward). Speed is the car's whole-vehicle
+- **Altimeter (H) / Velocity (V):** on-screen readouts for the focused car —
+  altitude above the fall-off line (a fixed level at the bottom of the screen, in m,
+  so it reads true elevation along the track rather than clearance over the hill
+  directly below) and velocity as **H**orizontal / **V**ertical / **Tot**al
+  (m/s; vertical is positive upward). Velocity is the car's whole-vehicle
   center-of-mass velocity, so spinning or flipping doesn't inflate it. They sit
   top-center; when both are on, altitude is on top and speed just below. In
   Human-vs-Human split mode each screen shows its own player's meters.
