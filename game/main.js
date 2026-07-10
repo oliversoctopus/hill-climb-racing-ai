@@ -310,4 +310,26 @@ window.addEventListener("keydown", e => { _handleGameKey(e, true); _handleAction
 window.addEventListener("keyup",   e => { _handleGameKey(e, false); });
 document.getElementById("stage").addEventListener("mousedown", focusGame);
 
+// Interacting with a button/checkbox/dropdown leaves keyboard focus ON that control:
+// a focused button keeps a black ring, and a focused checkbox or <select> swallows
+// every driving key (_handleGameKey ignores keys while a form field is focused — and a
+// focused <select> would change its own value on arrow keys), so you can't drive. Two
+// delegated listeners hand focus straight back to the game so every current AND future
+// control is covered (superseding the per-handler blur() the mode/terrain menus already
+// do). Number/text inputs are deliberately left alone so you can still type in them.
+//  - buttons on `click` (a button has no `change` event)
+//  - checkboxes and <select>s on `change`, NOT click: blurring a <select> mid-click
+//    would slam the dropdown shut before you could pick an option.
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t && t.tagName === "BUTTON") { t.blur(); focusGame(); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t && (t.tagName === "SELECT" || (t.tagName === "INPUT" && t.type === "checkbox"))) {
+    t.blur();
+    focusGame();
+  }
+});
+
 window.addEventListener("load", () => { init(); focusGame(); });
