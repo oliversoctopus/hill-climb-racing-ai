@@ -303,6 +303,12 @@ var b2PrismaticJointDef = Box2D.Dynamics.Joints.b2PrismaticJointDef;
 var b2DistanceJointDef = Box2D.Dynamics.Joints.b2DistanceJointDef;
 var b2FilterData = Box2D.Dynamics.b2FilterData;
 
+// Raise Box2D's speed cap 10x: b2_maxTranslation 2.0 -> 20 m/step = 60 -> 600 m/s at
+// 30 fps (the stock cap makes Rocket/fast-fall cheats misbehave). Browser-only; safe
+// (continuous collision still catches fast bodies; legit play never exceeds ~30 m/s).
+Box2D.Common.b2Settings.b2_maxTranslation = 20.0;
+Box2D.Common.b2Settings.b2_maxTranslationSquared = 20.0 * 20.0;
+
 // p5 helper polyfills (the ones Car/Wheel/Person use that aren't covered by p5)
 function createVector(x, y) { return { x: x, y: y }; }
 function color() { return null; }
