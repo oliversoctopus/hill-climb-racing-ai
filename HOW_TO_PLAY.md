@@ -69,7 +69,8 @@ Other buttons:
   found. "Replaying run…" appears next to the button while the replay plays.
 
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
-**Z** Zero-G (toggle), **F** float the car(s) up, **H** altimeter, **V** velocity,
+**Z** Zero-G (toggle), **F** float the car(s) up, **U** Underworld (drop the car(s) to
+altitude 1.5 m, just above the fall-off line), **H** altimeter, **V** velocity,
 **C** distance (current-position score), **R** Restart (same terrain), **T** Regenerate
 terrain, **P** Pause/Resume,
 **Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
@@ -110,7 +111,7 @@ Regenerate terrain** re-rolls the shared map and clears old runs.
 Below the main controls is an **ℹ️ Info** row (Altimeter, Velocity, Distance —
 read-only readouts, not cheats), a **✨ Cheats** row, and a **🐞 Bug probe** panel. The
 **info readouts and cheats** — Altimeter, Velocity, Distance, Invincible, Zero-G + Float,
-and the physics/motor knobs — apply to **every car on screen, the AI included, in
+Underworld, and the physics/motor knobs — apply to **every car on screen, the AI included, in
 all modes** (even AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
 for *recording* use **Mode: Human only**. Nothing here persists or touches the
 source physics — it's all runtime, so AI/browser parity and the deployed model
@@ -128,6 +129,10 @@ are unaffected (no retrain implied).
   going). With no gravity and no ground, any spin that grows is a pure
   joint/solver artifact. The camera follows the car vertically as it drifts.
   Pressing **Zero-G** again restores gravity.
+- **Underworld (U):** the opposite of Float — teleports the car(s) straight down to
+  **altitude 1.5 m** (the Altimeter's reading: elevation above the fall-off line at the
+  bottom of the screen), preserving linear and angular velocity. That's right on the
+  brink of the void, so turn on **Invincible** first if you don't want to fall off.
 - **Altimeter (H) / Velocity (V):** on-screen readouts for the focused car —
   altitude above the fall-off line (a fixed level at the bottom of the screen, in m,
   so it reads true elevation along the track rather than clearance over the hill

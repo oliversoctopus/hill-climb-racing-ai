@@ -8,6 +8,7 @@ import {
   ROCKET_ROT_RATE, ROCKET_ROT_DAMP, ROCKET_LIN_DAMP,
 } from "./state.js";
 import { Vec2, getSpawningY } from "./bridge.js";
+import { KILL_LINE_M } from "./geom.js";
 import { _vehicleCoM } from "./sim.js";
 import { humanAction } from "./input.js";
 
@@ -222,6 +223,37 @@ export function bpFloatCar() {
   }
   if (n === 0) { bpSetStatus("No car to float — start a run first."); return; }
   bpSetStatus(`Floated ${n > 1 ? `${n} cars` : "car"} up (velocity preserved, camera follows). Enable Zero-G to watch a pure joint/solver spin.`);
+}
+// "Underworld" cheat: teleport every car straight down to a fixed low altitude (1.5 m
+// above the fall-off line), PRESERVING both linear and angular velocity so it keeps doing
+// exactly what it was doing. "Altitude" here is the absolute elevation above the kill line
+// the Altimeter reads (geom.altitudeAboveKillLine), so we shift the whole assembly so its
+// chassis sits at that altitude — right on the brink of the void.
+const UNDERWORLD_ALTITUDE_M = 1.5;
+function _bpUnderworldOneCar(c) {
+  // y-down world: altitude = KILL_LINE_M − y, so the target altitude maps to this y, and
+  // dyM (>0 = downward) is how far to slide the whole car to put its chassis there.
+  const targetY = KILL_LINE_M - UNDERWORLD_ALTITUDE_M;
+  const dyM = targetY - c.chassisBody.GetPosition().y;
+  const bodies = c.bodies();
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]; if (!b) continue;
+    const bp = b.GetPosition();
+    b.SetPositionAndAngle(new Vec2(bp.x, bp.y + dyM), b.GetAngle());
+    b.SetAwake(true);   // velocity (linear + angular) preserved
+  }
+}
+export function bpUnderworld() {
+  // Send every car on screen down to the underworld — AI and human alike.
+  let n = 0;
+  if (S.players) {
+    for (let i = 0; i < S.players.length; i++) {
+      const p = S.players[i];
+      if (p.car) { _bpUnderworldOneCar(p.car); n++; }
+    }
+  }
+  if (n === 0) { bpSetStatus("No car to send under — start a run first."); return; }
+  bpSetStatus(`Underworld — dropped ${n > 1 ? `${n} cars` : "car"} to altitude ${UNDERWORLD_ALTITUDE_M} m above the fall-off line (velocity preserved). Turn on Invincible to survive down here.`);
 }
 export function bpFlag() {
   S.bpFlags.push({ tick: S.tickCount, idx: S.bpRecord.length });

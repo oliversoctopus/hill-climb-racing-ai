@@ -12,7 +12,7 @@ import { buildSimulation, buildWithGround, currentGroundSource, runOneStep } fro
 import { render, updateStats } from "./render.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
-  bpSetStatus, bpSetZeroG, bpFloatCar, bpFlag, bpDownload, bpApplyPhys, _bpNum,
+  bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpFlag, bpDownload, bpApplyPhys, _bpNum,
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 
@@ -266,6 +266,7 @@ document.getElementById("stage").addEventListener("wheel", e => {
   }
 }, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
+document.getElementById("bp_underworld").onclick = bpUnderworld;
 document.getElementById("bp_flag").onclick     = bpFlag;
 document.getElementById("bp_download").onclick = bpDownload;
 document.getElementById("bp_applyphys").onclick = () => { bpApplyPhys(true); };
