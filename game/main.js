@@ -10,7 +10,8 @@ import { AiPolicy, setGrassSprites, getSpawningY } from "./bridge.js";
 import { modeLabel, stageWidth } from "./modes.js";
 import { buildSimulation, buildWithGround, currentGroundSource, runOneStep,
          refreshSessionTerrainsMenu, updateCurrentTerrainBox } from "./sim.js";
-import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain } from "./saved_terrains.js";
+import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerrain,
+         findSavedByName, findSavedByGeometry } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
@@ -200,12 +201,16 @@ function renderSavedTerrainsMenu() {
     const load = document.createElement("button");
     load.textContent = "Load";
     load.dataset.savedLoad = String(i);
+    const ren = document.createElement("button");
+    ren.textContent = "Rename";
+    ren.dataset.savedRename = String(i);
     const del = document.createElement("button");
     del.textContent = "Delete";
     del.className = "danger";
     del.dataset.savedDel = String(i);
     row.appendChild(nm);
     row.appendChild(load);
+    row.appendChild(ren);
     row.appendChild(del);
     list.appendChild(row);
   }
@@ -239,6 +244,22 @@ document.getElementById("saved_list").onclick = (e) => {
     const saved = loadSavedTerrains();
     const i = parseInt(el.dataset.savedLoad, 10);
     if (i >= 0 && i < saved.length) loadTerrainObject(saved[i]);
+  } else if (el.dataset.savedRename !== undefined) {
+    const saved = loadSavedTerrains();
+    const i = parseInt(el.dataset.savedRename, 10);
+    if (i < 0 || i >= saved.length) return;
+    const oldName = saved[i].name;
+    const newName = (window.prompt(`Rename “${oldName}” to:`, oldName) || "").trim();
+    if (!newName || newName === oldName) return;   // cancelled, blank, or unchanged
+    if (findSavedByName(newName, i) !== -1) {
+      window.alert(`You already have a saved terrain named “${newName}”. Please choose a different name.`);
+      return;
+    }
+    renameSavedTerrain(i, newName);
+    // If the renamed map is the one we're currently driving, rename the current box too.
+    if (S.currentTerrainName === oldName) { S.currentTerrainName = newName; updateCurrentTerrainBox(); }
+    renderSavedTerrainsMenu();
+    setStatus(`Renamed “${oldName}” to “${newName}”.`);
   } else if (el.dataset.savedDel !== undefined) {
     const saved = loadSavedTerrains();
     const i = parseInt(el.dataset.savedDel, 10);
@@ -251,13 +272,28 @@ document.getElementById("saved_list").onclick = (e) => {
 // Save the CURRENT terrain to localStorage under a user-supplied name.
 document.getElementById("save_current_btn").onclick = () => {
   if (!S.ground || !S.ground.vectors) { setStatus("No terrain to save yet."); return; }
-  const name = (window.prompt("Name this terrain:", S.currentTerrainName || "") || "").trim();
-  if (!name) return;   // cancelled or blank
   const terrain = {
-    name,
+    name: "",
     vertices: S.ground.vectors.map(v => [v.x * SCALE, v.y * SCALE]),   // px, loadedTrack format
     spawning_y: getSpawningY(),
   };
+  // Block saving the same map twice — name which existing saved terrain it duplicates.
+  const dupGeo = findSavedByGeometry(terrain);
+  if (dupGeo !== -1) {
+    const existing = loadSavedTerrains()[dupGeo];
+    setStatus(`Already saved as “${existing.name}”.`);
+    window.alert(`This terrain is identical to your saved terrain “${existing.name}”, so it wasn't saved again.`);
+    return;
+  }
+  const name = (window.prompt("Name this terrain:", S.currentTerrainName || "") || "").trim();
+  if (!name) return;   // cancelled or blank
+  // Names must be unique (case-insensitive).
+  if (findSavedByName(name) !== -1) {
+    setStatus(`A saved terrain named “${name}” already exists.`);
+    window.alert(`You already have a saved terrain named “${name}”. Please choose a different name.`);
+    return;
+  }
+  terrain.name = name;
   if (!addSavedTerrain(terrain)) { setStatus("Couldn't save — browser storage is full or disabled."); return; }
   S.currentTerrainName = name;
   updateCurrentTerrainBox();

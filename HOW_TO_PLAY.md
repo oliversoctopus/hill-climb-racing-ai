@@ -65,9 +65,11 @@ Other buttons:
 - **💾 Saved Terrains** — opens a menu of maps you've saved in this browser.
   **＋ Save Current Terrain** prompts for a name and stores the current map to
   the browser's local storage (survives closing/reopening and redeploys — but
-  only in the same browser + domain). Each saved map has **Load** and **Delete**
+  only in the same browser + domain). Names must be unique, and saving a map
+  that's identical to one you already have is blocked (it tells you which saved
+  terrain it matches). Each saved map has **Load**, **Rename**, and **Delete**
   (Delete asks once to confirm). A **Current terrain: …** box under the controls
-  always shows which map you're on.
+  always shows which map you're on; renaming the current map updates it.
 - **⌨ Keybinds** — pops up the keyboard-shortcut cheat sheet.
 - **▶ Watch the AI beat the game (or get close)** — runs the Go-Explore
   save-scum backtracking search on the *current* terrain, then replays the run

@@ -42,3 +42,52 @@ export function removeSavedTerrain(index) {
   _write(all);
   return all;
 }
+
+// Rename the terrain at `index`. Returns the updated array, or null on write failure.
+// Caller is responsible for uniqueness checks (findSavedByName) before calling.
+export function renameSavedTerrain(index, newName) {
+  const all = loadSavedTerrains();
+  if (index < 0 || index >= all.length) return all;
+  all[index].name = newName;
+  return _write(all) ? all : null;
+}
+
+// ---- Duplicate detection -------------------------------------------------
+// Names are unique case-insensitively (so "Map" and "map" collide). Returns the index
+// of an existing terrain with the same name, or -1. `exceptIndex` is skipped so a rename
+// doesn't clash with the terrain being renamed.
+function _norm(name) { return (name || "").trim().toLowerCase(); }
+export function findSavedByName(name, exceptIndex) {
+  const key = _norm(name);
+  const all = loadSavedTerrains();
+  for (let i = 0; i < all.length; i++) {
+    if (i === exceptIndex) continue;
+    if (_norm(all[i].name) === key) return i;
+  }
+  return -1;
+}
+
+// Geometry equality with a tiny tolerance — the px vertices survive a save→load→save
+// round trip (which divides by SCALE and multiplies back) only up to float rounding, so
+// exact === would miss re-saves of a reloaded map. GEO_EPS (1e-6 px) is far below the
+// whole-pixel spacing between genuinely different maps.
+const GEO_EPS = 1e-6;
+function _closeEq(a, b) { return Math.abs(a - b) <= GEO_EPS; }
+function _sameGeometry(a, b) {
+  if (!a || !b || !_closeEq(a.spawning_y, b.spawning_y)) return false;
+  const av = a.vertices, bv = b.vertices;
+  if (!Array.isArray(av) || !Array.isArray(bv) || av.length !== bv.length) return false;
+  for (let i = 0; i < av.length; i++) {
+    if (!_closeEq(av[i][0], bv[i][0]) || !_closeEq(av[i][1], bv[i][1])) return false;
+  }
+  return true;
+}
+// Index of a saved terrain with the same geometry as `terrain`, or -1.
+export function findSavedByGeometry(terrain, exceptIndex) {
+  const all = loadSavedTerrains();
+  for (let i = 0; i < all.length; i++) {
+    if (i === exceptIndex) continue;
+    if (_sameGeometry(all[i], terrain)) return i;
+  }
+  return -1;
+}
