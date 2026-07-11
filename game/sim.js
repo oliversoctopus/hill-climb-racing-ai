@@ -301,29 +301,49 @@ export function currentGroundSource() {
 export function recordSessionTerrain() {
   if (!S.ground || !S.ground.vectors) return;
   S.terrainCounter += 1;
+  const name = `Terrain ${S.terrainCounter}`;
   S.sessionTerrains.push({
     id: S.terrainCounter,
-    name: `Terrain ${S.terrainCounter}`,
+    name,
     vertices: S.ground.vectors.map(v => [v.x * SCALE, v.y * SCALE]),
     spawning_y: getSpawningY(),
   });
   if (S.sessionTerrains.length > MAX_SESSION_TERRAINS) S.sessionTerrains.shift();
-  _populateTerrainSelect();
+  S.currentTerrainName = name;   // a freshly generated map becomes the current one
+  refreshSessionTerrainsMenu();
 }
-export function _populateTerrainSelect() {
-  const sel = document.getElementById("terrain_select");
-  if (!sel) return;
-  sel.innerHTML = "";
-  const ph = document.createElement("option");
-  ph.value = ""; ph.textContent = `— past terrains (${S.sessionTerrains.length}) —`;
-  sel.appendChild(ph);
-  for (let i = S.sessionTerrains.length - 1; i >= 0; i--) {   // newest first
-    const t = S.sessionTerrains[i];
-    const opt = document.createElement("option");
-    opt.value = String(t.id);
-    opt.textContent = t.name;
-    sel.appendChild(opt);
+// Render the session-terrain list into the Terrains menu (newest first). Rows carry the
+// terrain id in a data attribute; main.js delegates the click-to-load. Also refreshes the
+// current-terrain box so both stay in sync from one call.
+export function refreshSessionTerrainsMenu() {
+  const list = document.getElementById("terrains_list");
+  if (list) {
+    list.innerHTML = "";
+    if (!S.sessionTerrains.length) {
+      list.innerHTML = '<div class="menu-empty">No terrains generated yet this session.</div>';
+    } else {
+      for (let i = S.sessionTerrains.length - 1; i >= 0; i--) {   // newest first
+        const t = S.sessionTerrains[i];
+        const row = document.createElement("div");
+        row.className = "terrain-row";
+        const nm = document.createElement("span");
+        nm.className = "terrain-name";
+        nm.textContent = t.name + (t.name === S.currentTerrainName ? "  (current)" : "");
+        const load = document.createElement("button");
+        load.textContent = "Load";
+        load.dataset.sessionLoad = String(t.id);
+        row.appendChild(nm);
+        row.appendChild(load);
+        list.appendChild(row);
+      }
+    }
   }
+  updateCurrentTerrainBox();
+}
+// Reflect S.currentTerrainName in the little "current terrain" box under the controls.
+export function updateCurrentTerrainBox() {
+  const box = document.getElementById("current_terrain_box");
+  if (box) box.textContent = "Current terrain: " + (S.currentTerrainName || "—");
 }
 
 // ---- Actions + the per-tick step ----------------------------------------

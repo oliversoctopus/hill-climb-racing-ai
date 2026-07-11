@@ -17,6 +17,21 @@
   button:focus { outline: none; }   /* no lingering black ring after a click (focus is handed back to the game anyway) */
   #status { text-align: center; color: #ffa; font-size: 14px; }
   #stats { text-align: center; font-size: 14px; margin-top: 8px; }
+  /* Shared modal look for the Terrains / Saved Terrains menus (centered popover). */
+  .hcr-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #141414; color: #ddd; border: 1px solid #666; border-radius: 10px; padding: 18px 22px;
+    z-index: 1000; box-shadow: 0 10px 44px rgba(0,0,0,0.65); font-size: 14px; text-align: left;
+    min-width: 320px; max-width: 440px; }
+  .hcr-modal .modal-title { text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 10px; }
+  .hcr-modal .modal-footer { text-align: center; margin-top: 12px; }
+  .menu-list { max-height: 340px; overflow-y: auto; margin: 4px 0; }
+  .terrain-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; }
+  .terrain-row:nth-child(odd) { background: #1c1c1c; }
+  .terrain-row .terrain-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .terrain-row button { padding: 4px 12px; font-size: 13px; margin: 0; }
+  .terrain-row button.danger { background: #a33; }
+  .terrain-row button.danger:hover { background: #c44; }
+  .menu-empty { color: #999; padding: 14px 8px; text-align: center; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -47,10 +62,13 @@
       <option value="8">8x</option>
     </select>
   </label>
-  <label style="margin-left:12px;" title="Re-load any terrain generated earlier this session.">Terrains
-    <select id="terrain_select"><option value="">— past terrains (0) —</option></select>
-  </label>
+  <button id="terrains_btn" style="margin-left:12px;" title="Maps generated this session — click to re-load one">🗺 Terrains</button>
+  <button id="saved_btn" title="Terrains you've saved in this browser — save, load, or delete">💾 Saved Terrains</button>
   <button id="keybinds_btn" title="Show keyboard shortcuts">⌨ Keybinds</button>
+</div>
+<div style="text-align:center; margin:2px 12px 0;">
+  <span id="current_terrain_box" style="display:inline-block; padding:3px 12px; border:1px solid #555;
+        border-radius:12px; background:#222; color:#9fd4ff; font-size:13px;">Current terrain: —</span>
 </div>
 <div id="keybinds_panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
      background:#111; color:#ddd; border:1px solid #666; border-radius:8px; padding:18px 26px; z-index:1000;
@@ -76,6 +94,21 @@
   <div style="text-align:center; margin-top:12px;">
     <button id="keybinds_close">Close (Esc)</button>
   </div>
+</div>
+<div id="terrains_panel" class="hcr-modal">
+  <div class="modal-title">🗺 Session Terrains</div>
+  <div style="color:#999; font-size:12px; margin-bottom:8px; line-height:1.5;">Maps generated this session (newest
+    first). These are cleared when you close the page — use <b>Save Current Terrain</b> to keep one.</div>
+  <div id="terrains_list" class="menu-list"></div>
+  <div class="modal-footer"><button id="terrains_close">Close (Esc)</button></div>
+</div>
+<div id="saved_panel" class="hcr-modal">
+  <div class="modal-title">💾 Saved Terrains</div>
+  <div style="text-align:center; margin-bottom:10px;">
+    <button id="save_current_btn" style="background:#2a8;">＋ Save Current Terrain</button>
+  </div>
+  <div id="saved_list" class="menu-list"></div>
+  <div class="modal-footer"><button id="saved_close">Close (Esc)</button></div>
 </div>
 <div id="teleport_panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
      background:#111; color:#ddd; border:1px solid #666; border-radius:8px; padding:18px 26px; z-index:1000;

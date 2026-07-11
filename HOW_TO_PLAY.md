@@ -60,8 +60,14 @@ Other buttons:
 - **Pause / Resume** — freezes the sim.
 - **Speed (1x–8x)** — simulation speed multiplier (handy for watching the AI;
   for racing, stay on 1x).
-- **Terrains** — a dropdown of every map generated this session; pick one to
-  re-load it (Restart re-drives it, Regenerate makes a fresh one).
+- **🗺 Terrains** — opens a menu of every map generated this session (newest
+  first); click **Load** to re-drive one. Cleared when you close the page.
+- **💾 Saved Terrains** — opens a menu of maps you've saved in this browser.
+  **＋ Save Current Terrain** prompts for a name and stores the current map to
+  the browser's local storage (survives closing/reopening and redeploys — but
+  only in the same browser + domain). Each saved map has **Load** and **Delete**
+  (Delete asks once to confirm). A **Current terrain: …** box under the controls
+  always shows which map you're on.
 - **⌨ Keybinds** — pops up the keyboard-shortcut cheat sheet.
 - **▶ Watch the AI beat the game (or get close)** — runs the Go-Explore
   save-scum backtracking search on the *current* terrain, then replays the run

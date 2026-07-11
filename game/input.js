@@ -95,6 +95,8 @@ export function _handleActionKey(e) {
   if (k === "escape") {
     document.getElementById("keybinds_panel").style.display = "none";
     document.getElementById("teleport_panel").style.display = "none";
+    document.getElementById("terrains_panel").style.display = "none";
+    document.getElementById("saved_panel").style.display = "none";
     return;
   }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field

@@ -110,9 +110,10 @@ export const S = {
   accumSec: 0,
   lastWallMs: 0,
 
-  // Session terrains (re-loadable from the Terrains dropdown)
+  // Session terrains (re-loadable from the Terrains menu)
   sessionTerrains: [],
   terrainCounter: 0,
+  currentTerrainName: "",   // name shown in the "current terrain" box (Terrain N, or a loaded name)
 
   // Image assets (loaded once at init)
   assets: {},

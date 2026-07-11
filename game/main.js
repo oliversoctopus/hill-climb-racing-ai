@@ -2,13 +2,15 @@
 // every DOM control. This is the only module that touches the page's buttons/inputs
 // and the requestAnimationFrame loop; the concern modules it imports do the work.
 import {
-  S, CANVAS_HEIGHT, SIM_DT,
+  S, CANVAS_HEIGHT, SIM_DT, SCALE,
   FLIGHT_SPEED_MIN, FLIGHT_SPEED_MAX, FLIGHT_SPEED_STEP, FLIGHT_SPEED_STEP_HI, FLIGHT_SPEED_STEP_BREAK,
   ROCKET_ACCEL_MIN, ROCKET_ACCEL_MAX, ROCKET_ACCEL_STEP,
 } from "./state.js";
 import { AiPolicy, setGrassSprites, getSpawningY } from "./bridge.js";
 import { modeLabel, stageWidth } from "./modes.js";
-import { buildSimulation, buildWithGround, currentGroundSource, runOneStep } from "./sim.js";
+import { buildSimulation, buildWithGround, currentGroundSource, runOneStep,
+         refreshSessionTerrainsMenu, updateCurrentTerrainBox } from "./sim.js";
+import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
@@ -158,23 +160,109 @@ document.getElementById("reset").onclick = () => {
   buildSimulation();
   setStatus(`Ready — ${modeLabel()}`);
 };
-document.getElementById("terrain_select").onchange = function() {
-  // Re-load a map generated earlier this session. Pinning it via loadedTrack means
-  // Restart re-drives it and a Mode switch keeps it (Regenerate clears it).
-  const id = parseInt(this.value, 10);
-  this.blur(); focusGame();
-  if (!id) return;
-  let t = null;
-  for (let i = 0; i < S.sessionTerrains.length; i++) if (S.sessionTerrains[i].id === id) { t = S.sessionTerrains[i]; break; }
-  if (!t) return;
+// ---- Terrains + Saved Terrains menus ----
+// Load a terrain object ({vertices px, spawning_y, name}) from either menu. Pinning it
+// via loadedTrack means Restart re-drives it and a Mode switch keeps it (Regenerate
+// clears it). Same path the old Terrains dropdown used.
+function loadTerrainObject(t) {
   if (S.mode === "bestofx") {   // clear stale Best-of-X runs like Regenerate does
     S.bestofxRuns = [];
     document.getElementById("bestofx_results").style.display = "none";
     document.getElementById("bestofx_status").textContent = "";
   }
   S.loadedTrack = { vertices: t.vertices, spawning_y: t.spawning_y, name: t.name };
+  S.currentTerrainName = t.name;
   setStatus(`Loaded ${t.name} — ${modeLabel()}`);
   buildSimulation();
+  updateCurrentTerrainBox();
+  closeTerrainMenus();
+  focusGame();
+}
+function closeTerrainMenus() {
+  document.getElementById("terrains_panel").style.display = "none";
+  document.getElementById("saved_panel").style.display = "none";
+}
+// Render the Saved Terrains list from localStorage: one row per map with Load + Delete.
+function renderSavedTerrainsMenu() {
+  const list = document.getElementById("saved_list");
+  const saved = loadSavedTerrains();
+  list.innerHTML = "";
+  if (!saved.length) {
+    list.innerHTML = '<div class="menu-empty">No saved terrains yet. Find a map you like, then “Save Current Terrain”.</div>';
+    return;
+  }
+  for (let i = 0; i < saved.length; i++) {
+    const row = document.createElement("div");
+    row.className = "terrain-row";
+    const nm = document.createElement("span");
+    nm.className = "terrain-name";
+    nm.textContent = saved[i].name;
+    const load = document.createElement("button");
+    load.textContent = "Load";
+    load.dataset.savedLoad = String(i);
+    const del = document.createElement("button");
+    del.textContent = "Delete";
+    del.className = "danger";
+    del.dataset.savedDel = String(i);
+    row.appendChild(nm);
+    row.appendChild(load);
+    row.appendChild(del);
+    list.appendChild(row);
+  }
+}
+// Open buttons refresh their list first so it's always current.
+document.getElementById("terrains_btn").onclick = () => {
+  refreshSessionTerrainsMenu();
+  document.getElementById("terrains_panel").style.display = "block";
+};
+document.getElementById("saved_btn").onclick = () => {
+  renderSavedTerrainsMenu();
+  document.getElementById("saved_panel").style.display = "block";
+};
+document.getElementById("terrains_close").onclick = () => { document.getElementById("terrains_panel").style.display = "none"; focusGame(); };
+document.getElementById("saved_close").onclick    = () => { document.getElementById("saved_panel").style.display = "none"; focusGame(); };
+// Delegated clicks on the session list: load by terrain id.
+document.getElementById("terrains_list").onclick = (e) => {
+  const el = e.target;
+  if (!el || !el.dataset || el.dataset.sessionLoad === undefined) return;
+  const id = parseInt(el.dataset.sessionLoad, 10);
+  for (let i = 0; i < S.sessionTerrains.length; i++) {
+    if (S.sessionTerrains[i].id === id) { loadTerrainObject(S.sessionTerrains[i]); return; }
+  }
+};
+// Delegated clicks on the saved list: Load, or Delete-with-confirm (re-read from storage
+// so the index is always against the current list).
+document.getElementById("saved_list").onclick = (e) => {
+  const el = e.target;
+  if (!el || !el.dataset) return;
+  if (el.dataset.savedLoad !== undefined) {
+    const saved = loadSavedTerrains();
+    const i = parseInt(el.dataset.savedLoad, 10);
+    if (i >= 0 && i < saved.length) loadTerrainObject(saved[i]);
+  } else if (el.dataset.savedDel !== undefined) {
+    const saved = loadSavedTerrains();
+    const i = parseInt(el.dataset.savedDel, 10);
+    if (i >= 0 && i < saved.length && window.confirm(`Delete saved terrain “${saved[i].name}”?`)) {
+      removeSavedTerrain(i);
+      renderSavedTerrainsMenu();
+    }
+  }
+};
+// Save the CURRENT terrain to localStorage under a user-supplied name.
+document.getElementById("save_current_btn").onclick = () => {
+  if (!S.ground || !S.ground.vectors) { setStatus("No terrain to save yet."); return; }
+  const name = (window.prompt("Name this terrain:", S.currentTerrainName || "") || "").trim();
+  if (!name) return;   // cancelled or blank
+  const terrain = {
+    name,
+    vertices: S.ground.vectors.map(v => [v.x * SCALE, v.y * SCALE]),   // px, loadedTrack format
+    spawning_y: getSpawningY(),
+  };
+  if (!addSavedTerrain(terrain)) { setStatus("Couldn't save — browser storage is full or disabled."); return; }
+  S.currentTerrainName = name;
+  updateCurrentTerrainBox();
+  renderSavedTerrainsMenu();
+  setStatus(`Saved terrain “${name}”.`);
 };
 document.getElementById("pause").onclick = function() {
   S.paused = !S.paused;
