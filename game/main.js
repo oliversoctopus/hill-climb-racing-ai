@@ -173,6 +173,7 @@ function loadTerrainObject(t) {
   }
   S.loadedTrack = { vertices: t.vertices, spawning_y: t.spawning_y, name: t.name };
   S.currentTerrainName = t.name;
+  S.currentTerrainUnsaved = false;   // it exists (just loaded from a menu)
   setStatus(`Loaded ${t.name} — ${modeLabel()}`);
   buildSimulation();
   updateCurrentTerrainBox();
@@ -264,7 +265,11 @@ document.getElementById("saved_list").onclick = (e) => {
     const saved = loadSavedTerrains();
     const i = parseInt(el.dataset.savedDel, 10);
     if (i >= 0 && i < saved.length && window.confirm(`Delete saved terrain “${saved[i].name}”?`)) {
+      const deletedName = saved[i].name;
       removeSavedTerrain(i);
+      // If we're currently driving the map we just deleted, keep it loaded but mark the
+      // box "(unsaved)". The name stays so a re-save prefills it.
+      if (S.currentTerrainName === deletedName) { S.currentTerrainUnsaved = true; updateCurrentTerrainBox(); }
       renderSavedTerrainsMenu();
     }
   }
@@ -296,6 +301,7 @@ document.getElementById("save_current_btn").onclick = () => {
   terrain.name = name;
   if (!addSavedTerrain(terrain)) { setStatus("Couldn't save — browser storage is full or disabled."); return; }
   S.currentTerrainName = name;
+  S.currentTerrainUnsaved = false;
   updateCurrentTerrainBox();
   renderSavedTerrainsMenu();
   setStatus(`Saved terrain “${name}”.`);

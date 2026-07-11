@@ -310,6 +310,7 @@ export function recordSessionTerrain() {
   });
   if (S.sessionTerrains.length > MAX_SESSION_TERRAINS) S.sessionTerrains.shift();
   S.currentTerrainName = name;   // a freshly generated map becomes the current one
+  S.currentTerrainUnsaved = false;
   refreshSessionTerrainsMenu();
 }
 // Render the session-terrain list into the Terrains menu (newest first). Rows carry the
@@ -343,7 +344,11 @@ export function refreshSessionTerrainsMenu() {
 // Reflect S.currentTerrainName in the little "current terrain" box under the controls.
 export function updateCurrentTerrainBox() {
   const box = document.getElementById("current_terrain_box");
-  if (box) box.textContent = "Current terrain: " + (S.currentTerrainName || "—");
+  if (!box) return;
+  // "(unsaved)" flags a map whose saved copy was deleted — it's still loaded, just no
+  // longer stored. Only shown when there's actually a name to qualify.
+  const suffix = (S.currentTerrainUnsaved && S.currentTerrainName) ? " (unsaved)" : "";
+  box.textContent = "Current terrain: " + (S.currentTerrainName || "—") + suffix;
 }
 
 // ---- Actions + the per-tick step ----------------------------------------

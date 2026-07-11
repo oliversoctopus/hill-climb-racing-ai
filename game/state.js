@@ -114,6 +114,7 @@ export const S = {
   sessionTerrains: [],
   terrainCounter: 0,
   currentTerrainName: "",   // name shown in the "current terrain" box (Terrain N, or a loaded name)
+  currentTerrainUnsaved: false,   // true => current map's saved copy was deleted; box shows "(unsaved)"
 
   // Image assets (loaded once at init)
   assets: {},

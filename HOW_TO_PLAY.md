@@ -69,7 +69,9 @@ Other buttons:
   that's identical to one you already have is blocked (it tells you which saved
   terrain it matches). Each saved map has **Load**, **Rename**, and **Delete**
   (Delete asks once to confirm). A **Current terrain: …** box under the controls
-  always shows which map you're on; renaming the current map updates it.
+  always shows which map you're on; renaming the current map updates it, and
+  deleting the saved copy of the map you're on marks it **(unsaved)** (it stays
+  loaded — re-saving suggests the same name).
 - **⌨ Keybinds** — pops up the keyboard-shortcut cheat sheet.
 - **▶ Watch the AI beat the game (or get close)** — runs the Go-Explore
   save-scum backtracking search on the *current* terrain, then replays the run
