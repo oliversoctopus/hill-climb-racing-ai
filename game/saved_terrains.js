@@ -53,10 +53,10 @@ export function renameSavedTerrain(index, newName) {
 }
 
 // ---- Duplicate detection -------------------------------------------------
-// Names are unique case-insensitively (so "Map" and "map" collide). Returns the index
-// of an existing terrain with the same name, or -1. `exceptIndex` is skipped so a rename
-// doesn't clash with the terrain being renamed.
-function _norm(name) { return (name || "").trim().toLowerCase(); }
+// Names are unique case-SENSITIVELY (so "Map" and "map" are distinct), after trimming
+// surrounding whitespace. Returns the index of an existing terrain with the same name,
+// or -1. `exceptIndex` is skipped so a rename doesn't clash with the terrain being renamed.
+function _norm(name) { return (name || "").trim(); }
 export function findSavedByName(name, exceptIndex) {
   const key = _norm(name);
   const all = loadSavedTerrains();

@@ -287,7 +287,7 @@ document.getElementById("save_current_btn").onclick = () => {
   }
   const name = (window.prompt("Name this terrain:", S.currentTerrainName || "") || "").trim();
   if (!name) return;   // cancelled or blank
-  // Names must be unique (case-insensitive).
+  // Names must be unique (case-sensitive).
   if (findSavedByName(name) !== -1) {
     setStatus(`A saved terrain named “${name}” already exists.`);
     window.alert(`You already have a saved terrain named “${name}”. Please choose a different name.`);
