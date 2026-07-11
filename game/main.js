@@ -181,7 +181,7 @@ document.getElementById("pause").onclick = function() {
   this.textContent = S.paused ? "Resume" : "Pause";
 };
 document.getElementById("speed").onchange = function() {
-  S.simSpeed = parseInt(this.value);
+  S.simSpeed = parseFloat(this.value);   // fractional (0.25x/0.5x) as well as integer speeds
 };
 document.getElementById("mode").onchange = function() {
   S.mode = this.value;
