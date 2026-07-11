@@ -92,7 +92,11 @@ export function _handleModeKey(e) {
 export function _handleActionKey(e) {
   if (e.repeat) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (k === "escape") { document.getElementById("keybinds_panel").style.display = "none"; return; }
+  if (k === "escape") {
+    document.getElementById("keybinds_panel").style.display = "none";
+    document.getElementById("teleport_panel").style.display = "none";
+    return;
+  }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
   const map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", u: "bp_underworld",
               h: "bp_altimeter", v: "bp_speed", c: "bp_distance", g: "bp_flight",

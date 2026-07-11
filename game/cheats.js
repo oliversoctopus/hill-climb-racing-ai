@@ -255,6 +255,57 @@ export function bpUnderworld() {
   if (n === 0) { bpSetStatus("No car to send under — start a run first."); return; }
   bpSetStatus(`Underworld — dropped ${n > 1 ? `${n} cars` : "car"} to altitude ${UNDERWORLD_ALTITUDE_M} m above the fall-off line (velocity preserved). Turn on Invincible to survive down here.`);
 }
+
+// ---- Teleport cheat -----------------------------------------------------
+// Teleport to an arbitrary spot given in the two units the HUD already shows: X is the
+// project SCORE (distance), Y is ALTITUDE in metres above the fall-off line (the
+// Altimeter reading). They're different units on purpose — both are recognizable from
+// the readouts. Inverse of the two metrics: score px = score*10 + SPAWN_X (see
+// sim.scorePx), altitude→y = KILL_LINE_M − altitude (see geom.altitudeAboveKillLine).
+
+// Reference car for the panel's prefill: the human's car if there is one, else the
+// first live car (so AI-only mode prefills from the AI).
+function _bpRefCar() {
+  const h = _bpHumanPlayer();
+  if (h && h.car) return h.car;
+  if (S.players) for (let i = 0; i < S.players.length; i++) if (S.players[i].car) return S.players[i].car;
+  return null;
+}
+// The reference car's CURRENT position expressed in teleport units, for prefilling the
+// panel — null if there's no car yet.
+export function bpTeleportCurrent() {
+  const c = _bpRefCar();
+  if (!c) return null;
+  const p = c.chassisBody.GetPosition();
+  return { score: Math.max(0, Math.floor((p.x * SCALE - SPAWN_X) / 10)),
+           altitude: KILL_LINE_M - p.y };
+}
+function _bpTeleportOneCar(c, targetXm, targetYm) {
+  // Shift the WHOLE assembly so the chassis lands at the target, preserving linear +
+  // angular velocity (same body-shift approach as Float/Underworld).
+  const p = c.chassisBody.GetPosition();
+  const dx = targetXm - p.x, dy = targetYm - p.y;
+  const bodies = c.bodies();
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]; if (!b) continue;
+    const bp = b.GetPosition();
+    b.SetPositionAndAngle(new Vec2(bp.x + dx, bp.y + dy), b.GetAngle());
+    b.SetAwake(true);
+  }
+}
+export function bpTeleport(score, altitudeM) {
+  const targetXm = (score * 10 + SPAWN_X) / SCALE;   // score → chassis x (meters)
+  const targetYm = KILL_LINE_M - altitudeM;          // altitude → chassis y (meters, y-down)
+  let n = 0;
+  if (S.players) {
+    for (let i = 0; i < S.players.length; i++) {
+      const p = S.players[i];
+      if (p.car) { _bpTeleportOneCar(p.car, targetXm, targetYm); n++; }
+    }
+  }
+  if (n === 0) { bpSetStatus("No car to teleport — start a run first."); return; }
+  bpSetStatus(`Teleported ${n > 1 ? `${n} cars` : "car"} to score ${Math.round(score)}, altitude ${altitudeM} m (velocity preserved).`);
+}
 export function bpFlag() {
   S.bpFlags.push({ tick: S.tickCount, idx: S.bpRecord.length });
   bpSetStatus(`Flagged at tick ${S.tickCount} (flag #${S.bpFlags.length}). Keep playing, then Download.`);

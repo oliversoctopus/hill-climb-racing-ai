@@ -12,7 +12,8 @@ import { buildSimulation, buildWithGround, currentGroundSource, runOneStep } fro
 import { render, updateStats } from "./render.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
-  bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpFlag, bpDownload, bpApplyPhys, _bpNum,
+  bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpTeleport, bpTeleportCurrent,
+  bpFlag, bpDownload, bpApplyPhys, _bpNum,
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 
@@ -267,6 +268,27 @@ document.getElementById("stage").addEventListener("wheel", e => {
 }, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_underworld").onclick = bpUnderworld;
+// Teleport: open the panel, prefilling X/Y from the current car so it's a sane start.
+document.getElementById("bp_teleport").onclick = () => {
+  const cur = bpTeleportCurrent();
+  if (cur) {
+    document.getElementById("teleport_x").value = String(cur.score);
+    document.getElementById("teleport_y").value = cur.altitude.toFixed(1);
+  }
+  document.getElementById("teleport_panel").style.display = "block";
+};
+document.getElementById("teleport_go").onclick = () => {
+  const x = parseFloat(document.getElementById("teleport_x").value);
+  const y = parseFloat(document.getElementById("teleport_y").value);
+  if (isNaN(x) || isNaN(y)) { bpSetStatus("Teleport: enter a numeric score (X) and altitude (Y)."); return; }
+  bpTeleport(x, y);
+  document.getElementById("teleport_panel").style.display = "none";
+  focusGame();
+};
+document.getElementById("teleport_close").onclick = () => {
+  document.getElementById("teleport_panel").style.display = "none";
+  focusGame();
+};
 document.getElementById("bp_flag").onclick     = bpFlag;
 document.getElementById("bp_download").onclick = bpDownload;
 document.getElementById("bp_applyphys").onclick = () => { bpApplyPhys(true); };

@@ -77,6 +77,21 @@
     <button id="keybinds_close">Close (Esc)</button>
   </div>
 </div>
+<div id="teleport_panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+     background:#111; color:#ddd; border:1px solid #666; border-radius:8px; padding:18px 26px; z-index:1000;
+     box-shadow:0 8px 40px rgba(0,0,0,0.6); font-size:15px; line-height:1.8; text-align:left; min-width:260px;">
+  <div style="text-align:center; font-weight:bold; font-size:17px; margin-bottom:10px;">✈ Teleport</div>
+  <div><label>X — score&nbsp;&nbsp;<input id="teleport_x" type="number" step="10" style="width:100px;"></label></div>
+  <div><label>Y — altitude (m)&nbsp;&nbsp;<input id="teleport_y" type="number" step="1" style="width:100px;"></label></div>
+  <div style="color:#999; font-size:12px; line-height:1.5; margin-top:8px; max-width:300px;">
+    X is the project <b>score</b> (distance); Y is <b>altitude</b> in metres above the fall-off line (the
+    Altimeter reading). Different units, but both match the on-screen readouts. Velocity is preserved —
+    turn on Invincible if you land somewhere risky.</div>
+  <div style="text-align:center; margin-top:14px;">
+    <button id="teleport_go" style="background:#2a8;">Teleport</button>
+    <button id="teleport_close">Cancel (Esc)</button>
+  </div>
+</div>
 <div id="backtrack_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px;">
   🧗 <button id="backtrack_run" style="background:#2a8;" title="Run the Go-Explore save-scum search on THIS terrain, then replay it — it flies off the end if it can, otherwise it shows the best run it managed.">▶ Watch the AI beat the game (or get close)</button>
   <button id="backtrack_abort" style="display:none; background:#a33;">Abort</button>
@@ -97,6 +112,7 @@
   <label style="margin-right:8px;"><input type="checkbox" id="bp_zerog" title="Toggle gravity off/on — everything keeps its velocity (Z)"> Zero-G</label>
   <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
   <button id="bp_underworld" title="Drop every car to altitude 1.5 m — right above the fall-off line at the bottom of the screen, preserving velocity (U)">Underworld</button>
+  <button id="bp_teleport" title="Teleport the car(s) to any position — X = score (distance), Y = altitude in metres">Teleport…</button>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>

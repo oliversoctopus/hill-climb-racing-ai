@@ -133,6 +133,10 @@ are unaffected (no retrain implied).
   **altitude 1.5 m** (the Altimeter's reading: elevation above the fall-off line at the
   bottom of the screen), preserving linear and angular velocity. That's right on the
   brink of the void, so turn on **Invincible** first if you don't want to fall off.
+- **Teleport:** opens a small window to teleport the car(s) to any position. **X is the
+  score** (distance) and **Y is altitude in metres** above the fall-off line — two
+  different units, but both are the numbers you already see in the HUD (score + Altimeter).
+  The fields prefill from the car's current spot; velocity is preserved. No keybind.
 - **Altimeter (H) / Velocity (V):** on-screen readouts for the focused car —
   altitude above the fall-off line (a fixed level at the bottom of the screen, in m,
   so it reads true elevation along the track rather than clearance over the hill
