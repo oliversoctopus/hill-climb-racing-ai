@@ -80,7 +80,7 @@ Other buttons:
 
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
 **Z** Zero-G (toggle), **F** float the car(s) up, **U** Underworld (drop the car(s) to
-altitude 1.5 m, just above the fall-off line), **H** altimeter, **V** velocity,
+altitude 1.5 m, just above the fall-off line), **X** stop (zero all velocity), **H** altimeter, **V** velocity,
 **C** distance (current-position score), **R** Restart (same terrain), **T** Regenerate
 terrain, **P** Pause/Resume,
 **Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
@@ -143,6 +143,14 @@ are unaffected (no retrain implied).
   **altitude 1.5 m** (the Altimeter's reading: elevation above the fall-off line at the
   bottom of the screen), preserving linear and angular velocity. That's right on the
   brink of the void, so turn on **Invincible** first if you don't want to fall off.
+- **Stop (X):** momentarily zeroes all velocity — horizontal, vertical, and
+  rotational — on every car, freezing it in place for an instant before gravity
+  and driving take over again. Handy for lining up a jump or killing a bad spin.
+- **Open Exit (E):** there's an invisible "underworld" between the terrain and a
+  floor just below the screen; you can slip into it from the open left edge, but
+  a wall seals the right end. This knocks that right wall down (on the current
+  map only) so you can drive out the right side. A rebuild — Restart, Regenerate,
+  loading a terrain, or switching mode — puts the wall back.
 - **Teleport:** opens a small window to teleport the car(s) to any position. **X is the
   score** (distance) and **Y is altitude in metres** above the fall-off line — two
   different units, but both are the numbers you already see in the HUD (score + Altimeter).

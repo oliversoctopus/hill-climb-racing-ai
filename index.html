@@ -82,6 +82,8 @@
     <tr><td><b>Z</b></td><td>Zero-G (toggle off / on)</td></tr>
     <tr><td><b>F</b></td><td>Float car up</td></tr>
     <tr><td><b>U</b></td><td>Underworld (drop car to altitude 1.5 m, just above the fall-off line)</td></tr>
+    <tr><td><b>X</b></td><td>Stop (momentarily zero all car velocity — horizontal, vertical, rotational)</td></tr>
+    <tr><td><b>E</b></td><td>Open Exit (knock down the underworld's right wall so you can drive out)</td></tr>
     <tr><td><b>H</b></td><td>Altimeter (toggle altitude readout)</td></tr>
     <tr><td><b>V</b></td><td>Velocity (toggle speed readout)</td></tr>
     <tr><td><b>C</b></td><td>Distance (toggle current-position score, under the player's score)</td></tr>
@@ -146,6 +148,8 @@
   <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
   <button id="bp_underworld" title="Drop every car to altitude 1.5 m — right above the fall-off line at the bottom of the screen, preserving velocity (U)">Underworld</button>
   <button id="bp_teleport" title="Teleport the car(s) to any position — X = score (distance), Y = altitude in metres">Teleport…</button>
+  <button id="bp_stop" title="Momentarily zero all velocity — horizontal, vertical, and rotational — on every car (X)">Stop</button>
+  <button id="bp_openexit" title="Knock down the invisible right wall of the 'underworld' (below the terrain) so you can drive out the right end. Restored on Restart/Regenerate (E)">Open Exit</button>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>

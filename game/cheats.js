@@ -256,6 +256,70 @@ export function bpUnderworld() {
   bpSetStatus(`Underworld — dropped ${n > 1 ? `${n} cars` : "car"} to altitude ${UNDERWORLD_ALTITUDE_M} m above the fall-off line (velocity preserved). Turn on Invincible to survive down here.`);
 }
 
+// "Stop" cheat: momentarily kill all motion — zero every body's linear AND angular
+// velocity on every car, so it freezes in place for an instant before gravity/driving
+// take over again. One-shot (not a hold). Applies to all cars, like Float/Underworld.
+function _bpStopOneCar(c) {
+  const bodies = c.bodies();
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]; if (!b) continue;
+    b.SetLinearVelocity(new Vec2(0, 0));
+    b.SetAngularVelocity(0);
+    b.SetAwake(true);
+  }
+}
+export function bpStop() {
+  let n = 0;
+  if (S.players) {
+    for (let i = 0; i < S.players.length; i++) {
+      const p = S.players[i];
+      if (p.car) { _bpStopOneCar(p.car); n++; }
+    }
+  }
+  if (n === 0) { bpSetStatus("No car to stop — start a run first."); return; }
+  bpSetStatus(`Stopped ${n > 1 ? `${n} cars` : "car"} — all velocity zeroed (momentary).`);
+}
+
+// "Open Exit" cheat: knock down the invisible RIGHT WALL that seals the "underworld"
+// (the space between the terrain and the invisible bottom floor). That wall is an
+// incidental collision edge — the ground's vertex list closes its render fill with two
+// bottom corners (Ground.js:64-65), and setBodies() turns EVERY consecutive pair into a
+// Box2D edge (Ground.js:109-116), so surf_last→bottomRight became a near-vertical wall at
+// the far right (and its grass-layer twin, offset up by grassThickness). The left side is
+// already open (the chain never closes back to surf_0), so removing the right wall lets
+// you drive straight out the right end. Runtime-only + opt-in: it mutates just THIS live
+// world's ground body, never the shared generation path, so training/parity are untouched.
+// A rebuild (Restart / Regenerate / load / mode switch) restores the wall.
+function _edgeMatches(fix, ax, ay, bx, by, eps) {
+  const s = fix.GetShape();
+  if (!s || s.m_vertexCount !== 2) return false;
+  const v0 = s.m_vertices[0], v1 = s.m_vertices[1];
+  const near = (v, x, y) => Math.abs(v.x - x) <= eps && Math.abs(v.y - y) <= eps;
+  return (near(v0, ax, ay) && near(v1, bx, by)) || (near(v0, bx, by) && near(v1, ax, ay));
+}
+export function bpOpenExit() {
+  const g = S.ground;
+  if (!g || !g.vectors || g.vectors.length < 3 || !g.dirtBody) { bpSetStatus("No terrain — start a run first."); return; }
+  const V = g.vectors, n = V.length;
+  const a = V[n - 3], b = V[n - 2];            // surf_last, bottomRight — the wall's endpoints (dirt)
+  const gt = (g.grassThickness || 5) / SCALE;  // grass edges sit this much higher (Ground.js:114)
+  const eps = 1e-4;
+  // Match the dirt wall (offset 0) and the grass wall (offset gt) on their bodies.
+  const targets = [{ body: g.dirtBody, off: 0 }, { body: g.grassBody, off: gt }];
+  let removed = 0;
+  for (let ti = 0; ti < targets.length; ti++) {
+    const body = targets[ti].body, off = targets[ti].off;
+    if (!body) continue;
+    const toKill = [];   // collect first — don't destroy mid-iteration
+    for (let f = body.GetFixtureList(); f; f = f.m_next) {
+      if (_edgeMatches(f, a.x, a.y - off, b.x, b.y - off, eps)) toKill.push(f);
+    }
+    for (let k = 0; k < toKill.length; k++) { body.DestroyFixture(toKill[k]); removed++; }
+  }
+  if (removed === 0) { bpSetStatus("Underworld exit already open (right wall not found)."); return; }
+  bpSetStatus("Underworld exit opened — the right wall is down. Drive off the right end to leave (Restart/Regenerate restores it).");
+}
+
 // ---- Teleport cheat -----------------------------------------------------
 // Teleport to an arbitrary spot given in the two units the HUD already shows: X is the
 // project SCORE (distance), Y is ALTITUDE in metres above the fall-off line (the

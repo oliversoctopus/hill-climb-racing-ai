@@ -15,8 +15,8 @@ import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerr
 import { render, updateStats } from "./render.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
-  bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpTeleport, bpTeleportCurrent,
-  bpFlag, bpDownload, bpApplyPhys, _bpNum,
+  bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpOpenExit,
+  bpTeleport, bpTeleportCurrent, bpFlag, bpDownload, bpApplyPhys, _bpNum,
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 
@@ -398,6 +398,8 @@ document.getElementById("stage").addEventListener("wheel", e => {
 }, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_underworld").onclick = bpUnderworld;
+document.getElementById("bp_stop").onclick = bpStop;
+document.getElementById("bp_openexit").onclick = bpOpenExit;
 // Teleport: open the panel, prefilling X/Y from the current car so it's a sane start.
 document.getElementById("bp_teleport").onclick = () => {
   const cur = bpTeleportCurrent();
