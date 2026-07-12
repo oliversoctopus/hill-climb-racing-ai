@@ -17,10 +17,15 @@ import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZer
 // and Code Bullet's Player.js. `scorePx` takes a raw x in px; `scoreOf` a player.
 export function scorePx(px) { return Math.max(0, Math.floor((px - SPAWN_X) / 10)); }
 export function scoreOf(p) { return scorePx(p.maxDistPx); }
+// Signed current-position distance (score units), NOT clamped at 0 — so driving or
+// teleporting behind the spawn line reads negative. Only the live Distance readout uses
+// this; the canonical Score (scoreOf) stays floored at 0.
+export function distancePx(px) { return Math.floor((px - SPAWN_X) / 10); }
 // Current-position score: like scoreOf but from the car's CURRENT x, not its high-water
-// mark (p.maxDistPx) — so it drops when the car rolls back. Falls back to the stored max.
+// mark (p.maxDistPx) — so it drops (and can go negative) when the car rolls back behind
+// spawn. Falls back to the stored max when there's no live car.
 export function curScoreOf(p) {
-  if (p && p.car && p.car.chassisBody) return scorePx(p.car.chassisBody.GetPosition().x * SCALE);
+  if (p && p.car && p.car.chassisBody) return distancePx(p.car.chassisBody.GetPosition().x * SCALE);
   return scoreOf(p);
 }
 
@@ -245,9 +250,11 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   S.tickCount = 0;
   S.cameraPanX = 0;
   S.cameraPanY = 0;
-  S.cam0.panX = S.cam0.panY = 0;
-  S.camL.panX = S.camL.panY = 0;
-  S.camR.panX = S.camR.panY = 0;
+  // Reset pan AND the feed-forward's remembered target so a rebuild doesn't see a huge
+  // phantom first-frame velocity (see render._followCamera).
+  S.cam0.panX = S.cam0.panY = S.cam0.lastTargetX = S.cam0.lastTargetY = 0;
+  S.camL.panX = S.camL.panY = S.camL.lastTargetX = S.camL.lastTargetY = 0;
+  S.camR.panX = S.camR.panY = S.camR.lastTargetX = S.camR.lastTargetY = 0;
   S.accumSec = 0;
   S.lastWallMs = 0;
   bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars

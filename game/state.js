@@ -81,9 +81,11 @@ export const S = {
   // Camera (published into cameraPanX/Y right before each viewport draws)
   cameraPanX: 0,
   cameraPanY: 0,
-  cam0: { panX: 0, panY: 0 },   // single-view modes
-  camL: { panX: 0, panY: 0 },   // Human-vs-Human left half
-  camR: { panX: 0, panY: 0 },   // Human-vs-Human right half
+  // panX/panY = current pan; lastTargetX/Y = previous frame's target, for the camera's
+  // velocity feed-forward (see render._followCamera).
+  cam0: { panX: 0, panY: 0, lastTargetX: 0, lastTargetY: 0 },   // single-view modes
+  camL: { panX: 0, panY: 0, lastTargetX: 0, lastTargetY: 0 },   // Human-vs-Human left half
+  camR: { panX: 0, panY: 0, lastTargetX: 0, lastTargetY: 0 },   // Human-vs-Human right half
 
   // Human input (held by keyboard listeners). Two control sets so two humans can
   // race on one keyboard. Semantics match the AI action space (right=forward).

@@ -113,16 +113,27 @@ function _followCamera(cam, focusX, focusYworld, anchorX) {
     const triggered = (cam.panX < 0) || (focusX - cam.panX < CAM_TRIGGER_MARGIN);
     target = triggered ? target : flooredTarget;
   }
-  if (Math.abs(target - cam.panX) > 400) cam.panX = target;   // snap on big jumps
-  else cam.panX += (target - cam.panX) * 0.25;
+  // Feed-forward the target's own per-frame velocity so the camera doesn't TRAIL a fast
+  // car. A plain lerp (`pan += (target-pan)*k`) lags a moving target by an offset
+  // proportional to its SPEED — so at high speed the car drifts off its anchor and either
+  // leaves the screen or trips the snap below in visible chunks. Adding (1-k)*(target-
+  // lastTarget) cancels that: the steady-state lag is zero, so the car holds its anchor at
+  // ANY constant speed and only slides (then eases back) while it's accelerating. k=0.25 =>
+  // 0.75 feed-forward.
+  if (Math.abs(target - cam.panX) > 400) cam.panX = target;   // snap on big jumps (teleport/respawn)
+  else cam.panX += (target - cam.panX) * 0.25 + (target - cam.lastTargetX) * 0.75;
+  cam.lastTargetX = target;
   // Vertical follow: keep the focus car inside a screen band. Stays ~0 in normal play,
   // only kicking in when it flies high or falls low. Target from the NEUTRAL-camera
-  // world y (not the panned screen position) so the return is smooth and symmetric.
+  // world y (not the panned screen position) so the return is smooth and symmetric. Same
+  // velocity feed-forward as the horizontal (k=0.2 => 0.8) — this is the axis that had no
+  // snap safety net, so without it a fast climb/fall trailed off-screen entirely.
   const topM = 120, botM = CANVAS_HEIGHT - 80;
   let targetY = 0;
   if (focusYworld < topM) targetY = focusYworld - topM;
   else if (focusYworld > botM) targetY = focusYworld - botM;
-  cam.panY += (targetY - cam.panY) * 0.2;
+  cam.panY += (targetY - cam.panY) * 0.2 + (targetY - cam.lastTargetY) * 0.8;
+  cam.lastTargetY = targetY;
 }
 
 // Draw sky + ground + grass for the current global cameraPanX/cameraPanY into a
