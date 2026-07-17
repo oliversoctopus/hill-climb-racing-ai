@@ -7,8 +7,6 @@ class Ground {
 
     this.id = "ground";
     this.vectors = [];
-    this.dirtBody;
-    this.grassBody;
 
     this.distance = 15 * canvas.width;
     this.x = 0;
@@ -26,7 +24,7 @@ class Ground {
   randomizeGround() {
     let startingPoint = random(100000);
 
-    for (var i = 0; i < this.distance; i += this.smoothness) {
+    for (let i = 0; i < this.distance; i += this.smoothness) {
 
       this.steepnessLevel = map(i, 0, this.distance, 130, 250);
       // this.steepnessLevel = map(i, 0, this.distance, 200, 200);
@@ -44,7 +42,7 @@ class Ground {
       this.vectors.push(new Vec2(i, canvas.height - map(noisedY, 0, 1, minHeight, maxHeight) + heightAddition));
 
       //add grass
-      for (var j = 0; j < 2; j++) {
+      for (let j = 0; j < 2; j++) {
         if (random(1) < 0.05) {
           this.grassPositions.push(floor(random(grassSprites.length)));
         } else {
@@ -65,7 +63,7 @@ class Ground {
     this.vectors.push(new Vec2(0, canvas.height + this.grassThickness * 2));
     spawningY = this.vectors[10].y - 100;
 
-    for (var vect of this.vectors) {
+    for (const vect of this.vectors) {
       vect.x /= SCALE;
       vect.y /= SCALE;
     }
@@ -74,11 +72,11 @@ class Ground {
 
   isTooSteep() {
 
-    for (var v of this.vectors) {
+    for (const v of this.vectors) {
 
       let oi = this.getPositions(v.x, 10, 1);
-      var totalDifference = 0;
-      for (var i = 1; i < oi.length; i++) {
+      let totalDifference = 0;
+      for (let i = 1; i < oi.length; i++) {
         totalDifference += max(0, oi[i - 1] - oi[i]);
       }
 
@@ -95,10 +93,10 @@ class Ground {
 
 
   cloneFrom(otherGround) {
-    for (var v of otherGround.vectors) {
+    for (const v of otherGround.vectors) {
       this.vectors.push(new Vec2(v.x, v.y));
     }
-    for (var g of otherGround.grassPositions) {
+    for (const g of otherGround.grassPositions) {
       this.grassPositions.push(g);
     }
   }
@@ -189,7 +187,7 @@ class Ground {
     pop();
   }
   makeBody() {
-    var bodyDef = new b2BodyDef();
+    const bodyDef = new b2BodyDef();
     bodyDef.type = b2StaticBody;
     bodyDef.position.x = 0; //canvas.width / 2 / SCALE;
     bodyDef.position.y = 0; //(canvas.height - 20) / SCALE;
@@ -200,14 +198,14 @@ class Ground {
   }
   addEdge(vec1, vec2, mask, category, isGrass) {
 
-    var fixDef = new b2FixtureDef();
+    const fixDef = new b2FixtureDef();
     fixDef.friction = 0.99; // 0.95;
     fixDef.restitution = 0.1;
     fixDef.shape = new b2PolygonShape();
 
     fixDef.shape.SetAsEdge(vec1, vec2);
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     filtData.categoryBits = category;
     filtData.maskBits = mask;
 
@@ -223,17 +221,17 @@ class Ground {
   //returns a list of Y positions directly after the input x.
   //the list contains numberOfPositions Y values which represent the upcoming hills
   getPositions(x, numberOfPositions, skip) {
-    var returnList = [];
-    for (var i = 0; i < this.vectors.length; i++) {
+    const returnList = [];
+    for (let i = 0; i < this.vectors.length; i++) {
       if (this.vectors[i].x >= x) {
-        for (var j = 0; j < min(skip * numberOfPositions, this.vectors.length - i); j += skip) {
+        for (let j = 0; j < min(skip * numberOfPositions, this.vectors.length - i); j += skip) {
           returnList.push(this.vectors[i + j].y);
         }
         break;
       }
     }
     if (returnList.length === 0) {
-      var fallbackY = this.vectors.length > 0 ? this.vectors[this.vectors.length - 1].y : 0;
+      const fallbackY = this.vectors.length > 0 ? this.vectors[this.vectors.length - 1].y : 0;
       returnList.push(fallbackY);
     }
     while (returnList.length < numberOfPositions) {
@@ -244,10 +242,10 @@ class Ground {
   showPoints(x, numberOfPositions, skip) {
     push();
     translate(-panX, -panY);
-    var returnList = [];
-    for (var i = 0; i < this.vectors.length; i++) {
+    const returnList = [];
+    for (let i = 0; i < this.vectors.length; i++) {
       if (this.vectors[i].x >= x) {
-        for (var j = 0; j < min(skip * numberOfPositions, this.vectors.length - i); j += skip) {
+        for (let j = 0; j < min(skip * numberOfPositions, this.vectors.length - i); j += skip) {
           fill(255);
           noStroke();
           ellipse(this.vectors[i + j].x * SCALE, this.vectors[i + j].y * SCALE, 10);

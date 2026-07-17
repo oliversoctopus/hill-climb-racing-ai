@@ -10,8 +10,8 @@ class Person {
     this.width = personWidth;
     this.torso = new Torso(x, y - (personHeight / 2), personHeight, personWidth, this.world);
     this.head = new Head(x, y - (personHeight + personWidth * 1), personWidth * 1, this.world);
-    var revJointDef = new b2RevoluteJointDef();
-    var jointPos = new Vec2(x / SCALE, (y - personHeight) / SCALE);
+    const revJointDef = new b2RevoluteJointDef();
+    const jointPos = new Vec2(x / SCALE, (y - personHeight) / SCALE);
 
     revJointDef.Initialize(this.head.body, this.torso.body, jointPos);
     // No neck limit: the head-to-torso joint doesn't exhibit the 180deg flip in practice
@@ -20,9 +20,9 @@ class Person {
 
 
 
-    var distJointDef = new b2DistanceJointDef();
-    var anchorTorso = new Vec2(x / SCALE, (y) / SCALE);
-    var anchorHead = new Vec2(x / SCALE, this.head.startingPosition.y / SCALE);
+    const distJointDef = new b2DistanceJointDef();
+    const anchorTorso = new Vec2(x / SCALE, (y) / SCALE);
+    const anchorHead = new Vec2(x / SCALE, this.head.startingPosition.y / SCALE);
     distJointDef.Initialize(this.head.body, this.torso.body, anchorHead, anchorTorso);
     this.distJoint = this.world.CreateJoint(distJointDef);
 
@@ -44,7 +44,6 @@ class Head {
     this.world = world;
     this.startingPosition = createVector(x, y);
     this.radius = r;
-    this.body;
     this.id = "head";
     this.makeBody();
     this.isCB = false;
@@ -68,7 +67,7 @@ class Head {
     this.body = this.world.CreateBody(bodyDef);
     this.body.SetUserData(this);
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     filtData.categoryBits = PERSON_CATEGORY;
     filtData.maskBits = PERSON_MASK;
     this.body.CreateFixture(fixDef).SetFilterData(filtData);
@@ -102,7 +101,6 @@ class Torso {
     this.width = width;
     this.height = height;
     this.startingPosition = createVector(centerX, centerY);
-    this.body;
     this.colour = color(0, 0, 0);
     this.makeBody();
 
@@ -125,7 +123,7 @@ class Torso {
     this.body = this.world.CreateBody(bodyDef);
     this.body.SetUserData(this);
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     // filtData.groupIndex = -1;
     filtData.categoryBits = PERSON_CATEGORY;
     filtData.maskBits = PERSON_MASK;

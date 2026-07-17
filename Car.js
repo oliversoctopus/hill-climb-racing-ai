@@ -9,7 +9,6 @@ class Car {
     this.wheels = [];
     this.startingPosition = createVector(x, y);
     this.id = "car";
-    this.chassisBody;
     this.chassisWidth = 125;
     this.chassisHeight = 40;
     this.wheelSize = 17;
@@ -26,13 +25,13 @@ class Car {
 
     // //console.log(this.world);
 
-    var bodyDef = new b2BodyDef();
+    const bodyDef = new b2BodyDef();
     bodyDef.type = b2DynamicBody;
     bodyDef.position.x = x / SCALE;
     bodyDef.position.y = y / SCALE;
     bodyDef.angle = 0;
 
-    var fixDef = new b2FixtureDef();
+    const fixDef = new b2FixtureDef();
     fixDef.density = this.carDensity;
     fixDef.friction = 0.5;
     fixDef.restitution = this.carRestitution;
@@ -58,7 +57,7 @@ class Car {
     // fixDef.shape.SetAsBox(this.chassisWidth / 2 / SCALE, this.chassisHeight / 2 / SCALE);
     this.chassisBody = this.world.CreateBody(bodyDef);
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     // filtData.groupIndex = -1;
     filtData.categoryBits = CHASSIS_CATEGORY;
     filtData.maskBits = CHASSIS_MASK;
@@ -66,14 +65,14 @@ class Car {
 
     this.chassisBody.CreateFixture(fixDef).SetFilterData(filtData);
     //
-    var fixDef2 = new b2FixtureDef();
-    fixDef2.density = this.carDensity;;
+    const fixDef2 = new b2FixtureDef();
+    fixDef2.density = this.carDensity;
     fixDef2.friction = 0.5;
     fixDef2.restitution = this.carRestitution;
     fixDef2.shape = new b2PolygonShape();
     // fixDef2.shape.SetAsBox(10 / SCALE, 100 / SCALE);
 
-    var vectors2 = [];
+    const vectors2 = [];
     vectors2.push(new Vec2(this.chassisWidth / 4, 0 - this.chassisHeight / 2));
     vectors2.push(new Vec2(this.chassisWidth / 4 - 15, 0 - this.chassisHeight / 2 - 20));
     vectors2.push(new Vec2(this.chassisWidth / 4 - 5, 0 - this.chassisHeight / 2 - 20));
@@ -83,17 +82,17 @@ class Car {
       vect.y /= SCALE;
     }
     fixDef2.shape.SetAsArray(vectors2, vectors2.length);
-    this.chassisBody.CreateFixture(fixDef2).SetFilterData(filtData);;
+    this.chassisBody.CreateFixture(fixDef2).SetFilterData(filtData);
     this.shapes.push(vectors2);
 
-    var fixDef3 = new b2FixtureDef();
-    fixDef3.density = this.carDensity;;
+    const fixDef3 = new b2FixtureDef();
+    fixDef3.density = this.carDensity;
     fixDef3.friction = 0.1;
     fixDef3.restitution = 0.1;
     fixDef3.shape = new b2PolygonShape();
     // fixDef2.shape.SetAsBox(10 / SCALE, 100 / SCALE);
 
-    var vectors3 = [];
+    const vectors3 = [];
     vectors3.push(new Vec2(this.chassisWidth / 2, 0 - this.chassisHeight / 2 + 5));
     vectors3.push(new Vec2(this.chassisWidth / 2 + 5, 0 - this.chassisHeight / 2 + 8));
     vectors3.push(new Vec2(this.chassisWidth / 2 + 5, this.chassisHeight / 2 - 5));
@@ -103,7 +102,7 @@ class Car {
       vect.y /= SCALE;
     }
     fixDef3.shape.SetAsArray(vectors3, vectors3.length);
-    this.chassisBody.CreateFixture(fixDef3).SetFilterData(filtData);;
+    this.chassisBody.CreateFixture(fixDef3).SetFilterData(filtData);
     this.shapes.push(vectors3);
 
     this.wheels.push(new Wheel(x - this.chassisWidth / 2 + this.wheelSize * 1.2, y + this.chassisHeight / 2 + this.wheelSize / 4, this.wheelSize, this.chassisBody, this.world));
@@ -111,8 +110,8 @@ class Car {
 
     this.person = new Person(x, y, 15, 30, this.world); //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<person
     this.person.torso.colour = color(this.player.shirtColorR, this.player.shirtColorG, this.player.shirtColorB);
-    var revJointDef = new b2RevoluteJointDef();
-    var jointPos = new Vec2(x / SCALE, y / SCALE);
+    const revJointDef = new b2RevoluteJointDef();
+    const jointPos = new Vec2(x / SCALE, y / SCALE);
     revJointDef.Initialize(this.person.torso.body, this.chassisBody, jointPos);
     // Angular limit: a distance joint only fixes the torso DISTANCE, not which side it
     // sits on, so a hard impact could push the driver into a second stable equilibrium
@@ -127,9 +126,9 @@ class Car {
     revJointDef.upperAngle = 104.5 * Math.PI / 180;   // back edge +105.5deg, 1deg margin
     this.revJoint = this.world.CreateJoint(revJointDef);
 
-    var distJointDef = new b2DistanceJointDef();
-    var anchorPerson = new Vec2(x / SCALE, (y - this.person.height * 2 / 3) / SCALE);
-    var anchorCar = new Vec2((x + this.chassisWidth / 2) / SCALE, (y - this.chassisHeight / 2) / SCALE);
+    const distJointDef = new b2DistanceJointDef();
+    const anchorPerson = new Vec2(x / SCALE, (y - this.person.height * 2 / 3) / SCALE);
+    const anchorCar = new Vec2((x + this.chassisWidth / 2) / SCALE, (y - this.chassisHeight / 2) / SCALE);
     distJointDef.Initialize(this.person.torso.body, this.chassisBody, anchorPerson, anchorCar);
     distJointDef.frequencyHz = 5;
     distJointDef.dampingRatio = 0.1;
@@ -153,7 +152,7 @@ class Car {
     let y = this.chassisBody.GetPosition().y * SCALE;
     let angle = this.chassisBody.GetAngle();
     this.person.show();
-    for (var i of this.wheels) {
+    for (const i of this.wheels) {
       i.show();
     }
     push();
@@ -187,7 +186,7 @@ class Car {
     // text(this.number, 0, 7);
     pop();
 
-    var tempPanX = x - this.startingPosition.x;
+    const tempPanX = x - this.startingPosition.x;
     if (nextPanX < tempPanX && (!fightMode || this.player == humanPlayer || humanPlayer.dead)) {
       nextPanX = tempPanX;
     }
@@ -229,10 +228,10 @@ class Car {
 
 
   motorOn(forward) {
-    var motorSpeed = 13;
+    const motorSpeed = 13;
     this.wheels[0].joint.EnableMotor(true);
     this.wheels[1].joint.EnableMotor(true);
-    var oldState = this.motorState;
+    const oldState = this.motorState;
     if (forward) {
       this.motorState = 1;
       this.wheels[0].joint.SetMotorSpeed(-motorSpeed * PI);
@@ -297,18 +296,18 @@ class Car {
   destroy(world) {
     try { world.DestroyJoint(this.distJoint); } catch (e) {}
     try { world.DestroyJoint(this.revJoint); } catch (e) {}
-    try { if (this.person && this.person.distJoint) world.DestroyJoint(this.person.distJoint); } catch (e) {}
-    try { if (this.person && this.person.headJoint) world.DestroyJoint(this.person.headJoint); } catch (e) {}
+    try { if (this.person?.distJoint) world.DestroyJoint(this.person.distJoint); } catch (e) {}
+    try { if (this.person?.headJoint) world.DestroyJoint(this.person.headJoint); } catch (e) {}
     try {
-      for (var i = 0; i < this.wheels.length; i++) {
-        var w = this.wheels[i];
+      for (let i = 0; i < this.wheels.length; i++) {
+        const w = this.wheels[i];
         if (w.joint) world.DestroyJoint(w.joint);
         if (w.prisJoint) world.DestroyJoint(w.prisJoint);
         if (w.distJoint) world.DestroyJoint(w.distJoint);
       }
     } catch (e) {}
-    var bs = this.bodies();
-    for (var j = 0; j < bs.length; j++) { try { world.DestroyBody(bs[j]); } catch (e) {} }
+    const bs = this.bodies();
+    for (let j = 0; j < bs.length; j++) { try { world.DestroyBody(bs[j]); } catch (e) {} }
   }
 
 }

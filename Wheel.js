@@ -5,14 +5,12 @@ class Wheel {
 
     this.startingPosition = createVector(x, y);
     this.radius = r;
-    this.body;
     this.world = world;
     this.id = "wheel";
     this.onGround = false;
     this.createBody();
 
-    this.rimBody;
-    let bodyDef = new b2BodyDef();
+    const bodyDef = new b2BodyDef();
     bodyDef.type = b2DynamicBody;
 
     bodyDef.position.x = this.startingPosition.x / SCALE;
@@ -29,28 +27,28 @@ class Wheel {
     this.rimBody = this.world.CreateBody(bodyDef);
 
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     filtData.groupIndex = -1;
     this.rimBody.CreateFixture(fixDef).SetFilterData(filtData);
 
     this.rimBody.SetUserData(this);
 
     if (chassisBody != null) {
-      var revJointDef = new b2RevoluteJointDef();
+      const revJointDef = new b2RevoluteJointDef();
       revJointDef.Initialize(this.body, this.rimBody, this.body.GetPosition());
       this.joint = this.world.CreateJoint(revJointDef);
     }
 
     if (chassisBody != null) {
-      var prisJointDef = new b2PrismaticJointDef();
+      const prisJointDef = new b2PrismaticJointDef();
       prisJointDef.Initialize(this.rimBody, chassisBody, this.body.GetPosition(), new Vec2(0, -1));
       this.prisJoint = this.world.CreateJoint(prisJointDef);
 
 
 
-      var distJointDef = new b2DistanceJointDef();
-      var anchorWheel = new Vec2(x / SCALE, y / SCALE);
-      var anchorCar = new Vec2((x) / SCALE, (y - r * 3) / SCALE);
+      const distJointDef = new b2DistanceJointDef();
+      const anchorWheel = new Vec2(x / SCALE, y / SCALE);
+      const anchorCar = new Vec2((x) / SCALE, (y - r * 3) / SCALE);
       distJointDef.Initialize(this.rimBody, chassisBody, anchorWheel, anchorCar);
       distJointDef.frequencyHz = 70;
       distJointDef.dampingRatio = 25;
@@ -88,7 +86,7 @@ class Wheel {
 
     this.body = this.world.CreateBody(bodyDef);
 
-    var filtData = new b2FilterData();
+    const filtData = new b2FilterData();
     // filtData.groupIndex = -1;
     filtData.categoryBits = WHEEL_CATEGORY;
     filtData.maskBits = WHEEL_MASK;
