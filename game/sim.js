@@ -123,10 +123,10 @@ export function makePlayer(agent, color, xOffsetPx, yOffsetPx) {
   const car = new Car(SPAWN_X + dx, getSpawningY() + dy, S.world, dummyPlayer);
   if (agent) agent.reset();   // clear any per-episode AI state
   return {
-    car: car,
-    agent: agent,             // null = human; otherwise an Agent (see ai_policy.js)
+    car,
+    agent,             // null = human; otherwise an Agent (see ai_policy.js)
     isAI: agent !== null,
-    color: color,
+    color,
     maxDistPx: car.chassisBody.GetPosition().x * SCALE,
     dead: false,
     // No-progress timeout state (AI only). Counter ticks up each step and resets
@@ -285,11 +285,11 @@ export function buildSimulation() {
 // SCALE. grassPositions are cosmetic (2 per vertex) — -1 = no sprite.
 export function makeSourceFromTrack(track) {
   const verts = [];
-  for (var i = 0; i < track.vertices.length; i++) {
+  for (let i = 0; i < track.vertices.length; i++) {
     verts.push(new Vec2(track.vertices[i][0] / SCALE, track.vertices[i][1] / SCALE));
   }
   const grass = [];
-  for (var i = 0; i < verts.length; i++) { grass.push(-1); grass.push(-1); }
+  for (let i = 0; i < verts.length; i++) { grass.push(-1); grass.push(-1); }
   return { vectors: verts, grassPositions: grass };
 }
 
@@ -355,7 +355,7 @@ export function updateCurrentTerrainBox() {
   // "(unsaved)" flags a map whose saved copy was deleted — it's still loaded, just no
   // longer stored. Only shown when there's actually a name to qualify.
   const suffix = (S.currentTerrainUnsaved && S.currentTerrainName) ? " (unsaved)" : "";
-  box.textContent = "Current terrain: " + (S.currentTerrainName || "—") + suffix;
+  box.textContent = `Current terrain: ${S.currentTerrainName || "—"}${suffix}`;
 }
 
 // ---- Actions + the per-tick step ----------------------------------------
@@ -381,8 +381,8 @@ export async function runOneStep() {
   // freshly-built world (see S.worldGen).
   const gen = S.worldGen;
 
-  for (var pi = 0; pi < S.players.length; pi++) {
-    var p = S.players[pi];
+  for (let pi = 0; pi < S.players.length; pi++) {
+    const p = S.players[pi];
     if (p.dead) continue;
     let action;
     if (S.replayActions !== null && p.agent) {
@@ -417,8 +417,8 @@ export async function runOneStep() {
   recordTick();   // bug probe: log human-car state this tick (no-op if no human)
 
   let allDead = true;
-  for (var pi = 0; pi < S.players.length; pi++) {
-    var p = S.players[pi];
+  for (let pi = 0; pi < S.players.length; pi++) {
+    const p = S.players[pi];
     if (p.dead) continue;
     _checkPlayerEndOfStep(p);
     if (!p.dead) allDead = false;

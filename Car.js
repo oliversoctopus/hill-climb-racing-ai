@@ -44,7 +44,7 @@ class Car {
     vectors.push(new Vec2(this.chassisWidth / 2, 0 - this.chassisHeight / 2 + 5));
     vectors.push(new Vec2(this.chassisWidth / 2, this.chassisHeight / 2));
     vectors.push(new Vec2(-this.chassisWidth / 2, this.chassisHeight / 2));
-    for (var vect of vectors) {
+    for (const vect of vectors) {
       vect.x /= SCALE;
       vect.y /= SCALE;
     }
@@ -77,7 +77,7 @@ class Car {
     vectors2.push(new Vec2(this.chassisWidth / 4 - 15, 0 - this.chassisHeight / 2 - 20));
     vectors2.push(new Vec2(this.chassisWidth / 4 - 5, 0 - this.chassisHeight / 2 - 20));
     vectors2.push(new Vec2(this.chassisWidth / 4 + 10, 0 - this.chassisHeight / 2));
-    for (var vect of vectors2) {
+    for (const vect of vectors2) {
       vect.x /= SCALE;
       vect.y /= SCALE;
     }
@@ -97,7 +97,7 @@ class Car {
     vectors3.push(new Vec2(this.chassisWidth / 2 + 5, 0 - this.chassisHeight / 2 + 8));
     vectors3.push(new Vec2(this.chassisWidth / 2 + 5, this.chassisHeight / 2 - 5));
     vectors3.push(new Vec2(this.chassisWidth / 2, this.chassisHeight / 2));
-    for (var vect of vectors3) {
+    for (const vect of vectors3) {
       vect.x /= SCALE;
       vect.y /= SCALE;
     }

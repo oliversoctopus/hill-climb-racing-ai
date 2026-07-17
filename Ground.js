@@ -104,11 +104,11 @@ class Ground {
   setBodies(worldToAddTo) {
     this.world = worldToAddTo;
     this.makeBody();
-    for (var i = 1; i < this.vectors.length; i++) {
+    for (let i = 1; i < this.vectors.length; i++) {
       this.addEdge(this.vectors[i - 1], this.vectors[i], DIRT_MASK, DIRT_CATEGORY, false);
     }
 
-    for (var i = 1; i < this.vectors.length; i++) {
+    for (let i = 1; i < this.vectors.length; i++) {
       this.addEdge(new Vec2(this.vectors[i - 1].x, this.vectors[i - 1].y - this.grassThickness / SCALE), new Vec2(this.vectors[i].x,
         this.vectors[i].y - this.grassThickness / SCALE), GRASS_MASK, GRASS_CATEGORY, true);
     }
@@ -127,7 +127,7 @@ class Ground {
     push();
     translate(-panX, -panY);
 
-    for (var i = 0; i < this.vectors.length - 3; i++) {
+    for (let i = 0; i < this.vectors.length - 3; i++) {
       if (this.grassPositions[2 * i] != -1) {
         image(grassSprites[this.grassPositions[2 * i]], this.vectors[i].x * SCALE - grassSprites[this.grassPositions[2 * i]].width / 2, this.vectors[i].y * SCALE - grassSprites[this.grassPositions[
             2 * i]].height /
@@ -142,7 +142,7 @@ class Ground {
         image(grassSprites[this.grassPositions[2 * i + 1]], tempX, tempY);
       }
     }
-    for (var i = 0; i < this.vectors.length - 2; i++) {
+    for (let i = 0; i < this.vectors.length - 2; i++) {
       vertex(this.vectors[i].x * SCALE, this.vectors[i].y * SCALE);
     }
 
@@ -154,12 +154,12 @@ class Ground {
     strokeWeight(3);
     stroke(66, 60, 0);
     // fill(0, 200, 0);
-    for (var i = 0; i < this.vectors.length - 3; i++) {
+    for (let i = 0; i < this.vectors.length - 3; i++) {
       line(this.vectors[i].x * SCALE, (this.vectors[i].y) * SCALE + 9, this.vectors[i + 1].x * SCALE, (this.vectors[i + 1].y) * SCALE + 9);
     }
     stroke(44, 90, 0);
 
-    for (var i = 0; i < this.vectors.length - 3; i++) {
+    for (let i = 0; i < this.vectors.length - 3; i++) {
       line(this.vectors[i].x * SCALE, (this.vectors[i].y) * SCALE + 6, this.vectors[i + 1].x * SCALE, (this.vectors[i + 1].y) * SCALE + 6);
     }
 
@@ -170,12 +170,12 @@ class Ground {
     //
 
 
-    for (var i = 0; i < this.vectors.length - 3; i++) {
+    for (let i = 0; i < this.vectors.length - 3; i++) {
       line(this.vectors[i].x * SCALE, (this.vectors[i].y) * SCALE - 5, this.vectors[i + 1].x * SCALE, (this.vectors[i + 1].y) * SCALE - 5);
     }
     stroke(0, 130, 0);
 
-    for (var i = 0; i < this.vectors.length - 3; i++) {
+    for (let i = 0; i < this.vectors.length - 3; i++) {
       // if (this.grassPositions[i] != -1) {
       //   image(grassSprites[this.grassPositions[i]], this.vectors[i].x * SCALE - grassSprites[this.grassPositions[i]].width / 2, this.vectors[i].y * SCALE - grassSprites[this.grassPositions[i]].height /
       //     2 - 15);

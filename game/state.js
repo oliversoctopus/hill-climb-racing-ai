@@ -5,8 +5,8 @@
 // module imports are read-only to the importer. Routing it all through one
 // imported object lets any module mutate `S.world = ...` etc. without a setter
 // per field. Everything here started life as a top-level `var` in the old
-// index.html monolith. (Kept as `var` per CONVENTIONS.md #10 — no modernization
-// churn in this structural split.)
+// index.html monolith; it is now `export const` (the object binding is const,
+// its fields mutate freely). See CONVENTIONS.md #10.
 
 // --- Physics/geometry constants (single-sourced in the index.html compat shim,
 // which the physics classes read as globals; we re-export them so modules can

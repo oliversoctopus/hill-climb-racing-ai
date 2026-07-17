@@ -75,8 +75,8 @@ function _drawCar(ctx, car, color, isAI) {
 // mocking the GetPosition/GetAngle the sprite helpers read. dims (px) come from the
 // export so sizes are exact. Mirrors _drawCar's order: torso, head, wheels, chassis.
 function _mockBody(o) {
-  return { GetPosition: function() { return { x: o.x, y: o.y }; },
-           GetAngle: function() { return o.angle || 0; } };
+  return { GetPosition() { return { x: o.x, y: o.y }; },
+           GetAngle() { return o.angle || 0; } };
 }
 function _drawCarFromPose(ctx, pose, color, d) {
   const assets = S.assets;
@@ -156,7 +156,7 @@ function _drawScenery(ctx, viewWidth) {
   const xRight = S.cameraPanX + viewWidth + 50;
   const topPts = [];
   const topIdx = [];
-  for (var i = 0; i < v.length - 2; i++) {
+  for (let i = 0; i < v.length - 2; i++) {
     const vx = v[i].x * SCALE, vy = v[i].y * SCALE;
     if (vx < xLeft) continue;
     if (vx > xRight) break;
@@ -167,7 +167,7 @@ function _drawScenery(ctx, viewWidth) {
     ctx.fillStyle = "#582300";
     ctx.beginPath();
     ctx.moveTo(topPts[0][0], topPts[0][1]);
-    for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
+    for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
     ctx.lineTo(topPts[topPts.length-1][0], CANVAS_HEIGHT);
     ctx.lineTo(topPts[0][0], CANVAS_HEIGHT);
     ctx.closePath();
@@ -177,7 +177,7 @@ function _drawScenery(ctx, viewWidth) {
     ctx.strokeStyle = "#007800"; ctx.lineWidth = 10;
     ctx.beginPath();
     ctx.moveTo(topPts[0][0], topPts[0][1]);
-    for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
+    for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
     ctx.stroke();
     // Four thin (weight-3) detail lines, matching Code Bullet's Ground.show(): two
     // olive lines below the terrain line and two bright-green highlights above it.
@@ -193,7 +193,7 @@ function _drawScenery(ctx, viewWidth) {
       const off = detail[d][1];
       ctx.beginPath();
       ctx.moveTo(topPts[0][0], topPts[0][1] + off);
-      for (var i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1] + off);
+      for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1] + off);
       ctx.stroke();
     }
   }
@@ -324,12 +324,12 @@ function _ghostSpeedComponents(idx) {
 // screen, split-screen, ghost replay) draws them identically. Each render path builds
 // a "cheat target" (a live car OR a replay frame) and calls drawCheatHUD once.
 function cheatTargetFromCar(car) {
-  return { altitude: function () { return _altitudeMeters(car); },
-           speed:    function () { return _speedComponents(car); } };
+  return { altitude() { return _altitudeMeters(car); },
+           speed() { return _speedComponents(car); } };
 }
 function cheatTargetFromGhost(pose, idx) {
-  return { altitude: function () { return _ghostAltitudeMeters(pose); },
-           speed:    function () { return _ghostSpeedComponents(idx); } };
+  return { altitude() { return _ghostAltitudeMeters(pose); },
+           speed() { return _ghostSpeedComponents(idx); } };
 }
 // Registry entries render top-to-bottom in this order. `on` reads the toggle flag;
 // `line` turns a target into the display string; `color`/`size` style the text.
@@ -337,18 +337,18 @@ function cheatTargetFromGhost(pose, idx) {
 // and ONE entry here — it then appears in all modes automatically.
 const CHEAT_HUD = [
   { color: "#9fd4ff",
-    on:   function () { return S.bpAltimeter; },
-    line: function (t) { return `⛰ Altitude ${t.altitude().toFixed(1)} m`; } },
+    on() { return S.bpAltimeter; },
+    line(t) { return `⛰ Altitude ${t.altitude().toFixed(1)} m`; } },
   { color: "#ffd27f", size: 20,
-    on:   function () { return S.bpSpeed; },
-    line: function (t) { const s = t.speed();
+    on() { return S.bpSpeed; },
+    line(t) { const s = t.speed();
       return `🚗 H ${s.h.toFixed(1)}  V ${s.v.toFixed(1)}  Tot ${s.total.toFixed(1)} m/s`; } },
   { color: "#9df0ff", size: 20,
-    on:   function () { return S.bpFlight; },
-    line: function () { return `✈ Flight speed ${S.flightSpeed} m/s  (scroll to adjust)`; } },
+    on() { return S.bpFlight; },
+    line() { return `✈ Flight speed ${S.flightSpeed} m/s  (scroll to adjust)`; } },
   { color: "#ff9d6e", size: 20,
-    on:   function () { return S.bpRocket; },
-    line: function () { return `🚀 Rocket thrust ${S.rocketAccel} m/s²  (scroll to adjust)`; } },
+    on() { return S.bpRocket; },
+    line() { return `🚀 Rocket thrust ${S.rocketAccel} m/s²  (scroll to adjust)`; } },
 ];
 // Draw every enabled readout for `target`, stacked from topY down. Returns the y after
 // the last line so callers can keep laying out below it if needed.

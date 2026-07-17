@@ -105,7 +105,7 @@ export async function runBestOfX() {
         attempt: i + 1,
         distance: distPx,
         score: Math.floor(distPx / 10),
-        actions: actions,
+        actions,
         spawnDx: dx,
         spawnDy: dy,
       });
@@ -258,12 +258,12 @@ async function btRoll(p, startAidx, burst, opts) {
     _checkPlayerEndOfStep(p);
     maxX = p.maxDistPx;
     if (maxX >= opts.beatPx) beaten = true;
-    if (p.dead)                  return { actions: actions, snaps: snaps, maxX: maxX, status: beaten ? "complete" : "dead",   n: t };
-    if (t >= opts.branchMaxTicks) return { actions: actions, snaps: snaps, maxX: maxX, status: beaten ? "complete" : "trunc",  n: t };
-    if (opts.ticks.n >= opts.budget) return { actions: actions, snaps: snaps, maxX: maxX, status: beaten ? "complete" : "budget", n: t };
+    if (p.dead)                  return { actions, snaps, maxX, status: beaten ? "complete" : "dead",   n: t };
+    if (t >= opts.branchMaxTicks) return { actions, snaps, maxX, status: beaten ? "complete" : "trunc",  n: t };
+    if (opts.ticks.n >= opts.budget) return { actions, snaps, maxX, status: beaten ? "complete" : "budget", n: t };
     if (t % 256 === 0) {
       await new Promise(r => { setTimeout(r, 0); });
-      if (S.backtrackAbort) return { actions: actions, snaps: snaps, maxX: maxX, status: "abort", n: t };
+      if (S.backtrackAbort) return { actions, snaps, maxX, status: "abort", n: t };
       document.getElementById("backtrack_status").textContent =
         `searching… tries ${opts.prog.tries}, deepest rewind ${opts.prog.maxDepth}, reached score ${scorePx(maxX)} (tick ${opts.ticks.n}/${opts.budget})`;
     }
@@ -298,7 +298,7 @@ async function jsBacktrackSolve(p, opts) {
   function out(o) { o.tries = tries; o.backtracks = backtracks; o.bottlenecks = bottlenecks;
                     o.maxDepth = maxDepth; o.ticks = opts.ticks.n; return o; }
   if (r.status === "abort")    return out({ solved: false, reason: "abort", maxX: r.maxX, segments: null });
-  if (r.status === "complete") return out({ solved: true, reason: "single-shot", maxX: r.maxX, segments: segments });
+  if (r.status === "complete") return out({ solved: true, reason: "single-shot", maxX: r.maxX, segments });
   let committed = r.actions, csnaps = r.snaps, bottleneck = r.maxX, depth = opts.initDepth;
   while (opts.ticks.n < opts.budget) {
     if (S.backtrackAbort)      return out({ solved: false, reason: "abort", maxX: bottleneck, segments: null });
@@ -321,7 +321,7 @@ async function jsBacktrackSolve(p, opts) {
       if (b.status === "complete") {
         segments = commitSegments(segments, seam, b.actions);
         bottlenecks += 1;
-        return out({ solved: true, reason: "backtrack", maxX: b.maxX, segments: segments });
+        return out({ solved: true, reason: "backtrack", maxX: b.maxX, segments });
       }
       if (b.maxX >= bottleneck + opts.margin) {     // cleared this wall, died later
         committed = committed.slice(0, seam.aidx).concat(b.actions);
@@ -352,7 +352,7 @@ function jsReplaySegments(p, segments) {
       poses.push(capturePose(p.car));
     }
   }
-  return { poses: poses, dims: dims };
+  return { poses, dims };
 }
 function _btUI(running) {
   document.getElementById("backtrack_run").disabled = running;
@@ -391,7 +391,7 @@ export async function runBacktrack() {
   document.getElementById("backtrack_status").textContent = "starting…";
 
   const p = buildSearchWorld(srcGround, sY);
-  const opts = { snapEvery: 20, attempts: 8, margin: 400, budget: budget, branchMaxTicks: 5000,
+  const opts = { snapEvery: 20, attempts: 8, margin: 400, budget, branchMaxTicks: 5000,
                burstMin: 2, burstMax: 8, initDepth: 2, beatPx: S.ground.distance - S.ground.smoothness };
   let res;
   try { res = await jsBacktrackSolve(p, opts); }
