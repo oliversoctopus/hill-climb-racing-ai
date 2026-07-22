@@ -52,7 +52,7 @@
   <button id="reset_pos" title="Put the car(s) back at the start of THIS SAME terrain — no new map. (R)">↺ Restart (same terrain)</button>
   <button id="reset" title="Throw away this terrain and generate a brand-new random map. (T)">🎲 Regenerate terrain</button>
   <button id="pause" title="Pause / Resume (P)">Pause</button>
-  <label style="margin-left:12px;">Speed
+  <label style="margin-left:12px;" title="Simulation speed (Alt+Scroll also steps this)">Speed
     <select id="speed">
       <option value="0.25">0.25x</option>
       <option value="0.5">0.5x</option>
@@ -78,6 +78,7 @@
     <tr><td style="padding-right:16px;"><b>← →</b> or <b>W A S D</b></td><td>Drive (either works in single-player)</td></tr>
     <tr><td><b>WASD</b> / <b>Arrows</b></td><td>Human-vs-Human: left player / right player</td></tr>
     <tr><td><b>Alt+1…5</b></td><td>Switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best of X)</td></tr>
+    <tr><td><b>Alt+Scroll</b></td><td>Sim speed (step through 0.25x–8x, scroll up = faster)</td></tr>
     <tr><td><b>I</b></td><td>Toggle Invincible mode</td></tr>
     <tr><td><b>Z</b></td><td>Zero-G (toggle off / on)</td></tr>
     <tr><td><b>F</b></td><td>Float car up</td></tr>
@@ -87,8 +88,8 @@
     <tr><td><b>H</b></td><td>Altimeter (toggle altitude readout)</td></tr>
     <tr><td><b>V</b></td><td>Velocity (toggle speed readout)</td></tr>
     <tr><td><b>C</b></td><td>Distance (toggle current-position score, under the player's score)</td></tr>
-    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; Alt+scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
-    <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; Alt+scroll = thrust</td></tr>
+    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
+    <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
     <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
     <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
     <tr><td><b>P</b></td><td>Pause / Resume</td></tr>
@@ -150,8 +151,8 @@
   <button id="bp_teleport" title="Teleport the car(s) to any position — X = score (distance), Y = altitude in metres">Teleport…</button>
   <button id="bp_stop" title="Momentarily zero all velocity — horizontal, vertical, and rotational — on every car (X)">Stop</button>
   <button id="bp_openexit" title="Toggle the invisible right wall of the 'underworld' (below the terrain): knock it down so you can drive out the right end, press again to put it back. Also restored on Restart/Regenerate (E)">Open Exit</button>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; Alt+scroll = speed 0–300 (G)"> Flight</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); Alt+scroll = thrust (J)"> Rocket</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
 </div>
 <details id="advanced_panel" style="max-width:1100px; margin:6px auto;">

@@ -58,8 +58,9 @@ Other buttons:
 - **🎲 Regenerate terrain** — throws away the current map and generates a
   brand-new random one, respawning everyone.
 - **Pause / Resume** — freezes the sim.
-- **Speed (1x–8x)** — simulation speed multiplier (handy for watching the AI;
-  for racing, stay on 1x).
+- **Speed (0.25x–8x)** — simulation speed multiplier (handy for watching the AI;
+  for racing, stay on 1x). **Alt+Scroll** anywhere on the page steps it too
+  (scroll up = faster).
 - **🗺 Terrains** — opens a menu of every map generated this session (newest
   first); click **Load** to re-drive one. Cleared when you close the page.
 - **💾 Saved Terrains** — opens a menu of maps you've saved in this browser.

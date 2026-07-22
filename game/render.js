@@ -345,10 +345,10 @@ const CHEAT_HUD = [
       return `🚗 H ${s.h.toFixed(1)}  V ${s.v.toFixed(1)}  Tot ${s.total.toFixed(1)} m/s`; } },
   { color: "#9df0ff", size: 20,
     on() { return S.bpFlight; },
-    line() { return `✈ Flight speed ${S.flightSpeed} m/s  (Alt+scroll to adjust)`; } },
+    line() { return `✈ Flight speed ${S.flightSpeed} m/s  (scroll to adjust)`; } },
   { color: "#ff9d6e", size: 20,
     on() { return S.bpRocket; },
-    line() { return `🚀 Rocket thrust ${S.rocketAccel} m/s²  (Alt+scroll to adjust)`; } },
+    line() { return `🚀 Rocket thrust ${S.rocketAccel} m/s²  (scroll to adjust)`; } },
 ];
 // Draw every enabled readout for `target`, stacked from topY down. Returns the y after
 // the last line so callers can keep laying out below it if needed.
