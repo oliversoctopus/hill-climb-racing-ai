@@ -1,7 +1,7 @@
 // Simulation core: world/terrain/car construction, the per-tick step, death
 // checks, and the small vehicle-geometry helpers the rest of the app shares.
 import {
-  S, SCALE, SPAWN_X, FRAME_RATE, STUCK_TIMEOUT_TICKS, MAX_SESSION_TERRAINS,
+  S, SCALE, SPAWN_X, FRAME_RATE, SIM_DT, STUCK_TIMEOUT_TICKS, MAX_SESSION_TERRAINS,
 } from "./state.js";
 import {
   Car, Ground, Box2D, Vec2, b2World, b2StaticBody, perlinSeed,
@@ -257,10 +257,12 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   S.cam0.panX = S.cam0.panY = S.cam0.lastTargetX = S.cam0.lastTargetY = 0;
   S.camL.panX = S.camL.panY = S.camL.lastTargetX = S.camL.lastTargetY = 0;
   S.camR.panX = S.camR.panY = S.camR.lastTargetX = S.camR.lastTargetY = 0;
-  S.accumSec = 0;
+  // One tick of credit: each tick computes at the START of the window that displays
+  // it, so render's interpolation adds no display latency (see render.js).
+  S.accumSec = SIM_DT;
   S.lastWallMs = 0;
   bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars
-  bpSyncExitButton(false);   // the fresh ground has its right wall back → button reads "Open Exit"
+  bpSyncExitButton(false);   // the fresh ground has its right wall back
   // Keep Zero-G in sync with its checkbox across rebuilds. The fresh world has normal
   // gravity (bpZeroG reset to false), so if the user left Zero-G ticked, re-apply it.
   // bpSetZeroG recaptures the fresh world's real gravity on entry, so bpSavedGravity
@@ -368,14 +370,11 @@ export function applyAction(car, action) {
   else car.motorOff();
 }
 
-// ---- Render-pose snapshots (fixed-timestep interpolation) ----------------
-// After every physics tick we snapshot each car's draw pose (capturePose — the same
-// format the ghost replay records) so render() can lerp between the last two ticks
-// and paint smooth in-between frames at rAF rate while physics stays at exactly
-// 30 Hz sim-time. Purely cosmetic: the interpolated poses are never fed back into
-// Box2D, the obs, or the recorder, so browser/training parity is untouched.
-// Roll the snapshots forward one tick: prev <- curr, curr <- live. Dead cars are
-// captured too — their ragdoll keeps moving under physics and is still drawn.
+// ---- Render-pose snapshots (fixed-timestep render smoothing) -------------
+// Per-tick pose snapshots (capturePose format) that render() extrapolates between
+// frames. Purely cosmetic — never fed back into Box2D/obs, so parity is untouched.
+// Roll forward one tick: prev <- curr, curr <- live. Dead cars are captured too —
+// their ragdoll keeps moving under physics and is still drawn.
 function _recordRenderPoses() {
   for (let pi = 0; pi < S.players.length; pi++) {
     const p = S.players[pi];
@@ -457,8 +456,8 @@ export async function runOneStep() {
     if (!p.dead) allDead = false;
   }
   _recordRenderPoses();
-  // Stepping stops on all-dead (the loop zeroes the accumulator → alpha 0, which
-  // renders PREV); snap so the held frame is the exact final pose, not one tick back.
+  // Stepping stops on all-dead; snap (delta 0) so the wreck holds its exact final
+  // pose instead of extrapolating its last velocity.
   if (allDead) snapRenderPoses();
   return allDead;
 }

@@ -98,14 +98,9 @@ async function loop() {
     }
   }
 
-  // Render EVERY rAF: physics stays at exactly 30 Hz sim-time, but render() draws each
-  // body at lerp(prev tick, curr tick, accumSec/SIM_DT) — real in-between frames, so
-  // slow sim speeds (and 60 Hz+ displays at 1x) look smooth instead of showing
-  // duplicated frames. (This also retires the old render-only-on-step gate: it existed
-  // because the smooth camera kept lerping at rAF rate past a car frozen between
-  // steps — interpolation moves the car every frame, so the camera can run per-frame
-  // too.) Skip while the Best-of-X / backtrack search owns the world — its headless
-  // loop bypasses the pose snapshots, so a live render would show stale poses.
+  // Render EVERY rAF: physics stays at 30 Hz sim-time, render() smooths the frames
+  // in between (see render.js). Skip while the Best-of-X / backtrack search owns the
+  // world — its headless loop bypasses the pose snapshots.
   if (!S.bestofxBusy) render();
   if (didStep || S.paused) updateStats();   // the DOM stats only change on a step
   requestAnimationFrame(loop);

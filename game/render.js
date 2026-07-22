@@ -10,15 +10,13 @@ import { scoreOf, scorePx, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
 
-// ---- Fixed-timestep render interpolation ---------------------------------
-// Physics steps at exactly 30 Hz sim-time (parity-locked); render() runs every rAF.
-// Each frame we draw every body at lerp(prev-tick pose, curr-tick pose, alpha), where
-// alpha is the fraction of a tick sitting in the wall-clock accumulator — so slow sim
-// speeds (and 60 Hz+ displays at 1x) get real in-between frames instead of duplicated
-// ones, at the cost of one tick of visual latency. sim.js records the snapshots
-// (p.rposePrev/rposeCurr) after each step; teleport-style jumps snap them equal.
-// Angles are Box2D's continuous (unwrapped) radians, so a plain lerp is exact — no
-// wrap handling needed (the fastest spin, wheels at 13π rad/s, is 1.36 rad < π/tick).
+// ---- Fixed-timestep render smoothing -------------------------------------
+// Physics steps at a fixed 30 Hz; render() runs every rAF, drawing each body at
+// lerp(prev tick, curr tick, alpha). The accumulator is primed one tick ahead
+// (sim.buildWithGround), so each tick computes at the START of the wall-clock
+// window that displays it: in-between frames are true interpolation between real
+// states (no extrapolation artifacts) with no added display latency. Ghost replays
+// interpolate the same way. Angles are Box2D's continuous radians — no wrap needed.
 function _renderAlpha() {
   return Math.max(0, Math.min(1, S.accumSec / SIM_DT));
 }
@@ -45,7 +43,7 @@ function _lerpCarPose(a, b, t) {
   return out;
 }
 // The pose to draw player p at this frame — or null to fall back to live bodies
-// (snapshots not seeded yet, e.g. a world built outside buildWithGround).
+// (snapshots not seeded yet).
 function _playerDrawPose(p, alpha) {
   const a = p.rposePrev, b = p.rposeCurr;
   if (!b) return null;
@@ -433,17 +431,15 @@ export function render() {
     }
   }
   if (focus === null && S.players.length > 0) focus = S.players[0];
-  // Ghost pose: interpolate between the previous and current recorded frames with the
-  // same one-tick-behind alpha as live physics; once done, hold the exact final frame
-  // (the accumulator is zeroed then, so raw alpha would show the second-to-last).
+  // Ghost pose: interpolate toward the KNOWN next recorded frame (a recording has no
+  // latency to hide); holds the final frame once done.
   let ghostPose = null;
   if (S.ghostPoses && S.ghostPoses.length) {
     const gi = Math.max(0, Math.min(S.ghostIdx, S.ghostPoses.length - 1));
-    const giPrev = Math.max(0, gi - 1);
-    const gAlpha = S.ghostDone ? 1 : alpha;
-    ghostPose = (giPrev === gi || gAlpha >= 1)
+    const giNext = Math.min(gi + 1, S.ghostPoses.length - 1);
+    ghostPose = (giNext === gi || S.ghostDone)
       ? S.ghostPoses[gi]
-      : _lerpCarPose(S.ghostPoses[giPrev], S.ghostPoses[gi], gAlpha);
+      : _lerpCarPose(S.ghostPoses[gi], S.ghostPoses[giNext], alpha);
   }
   const focusPose = focus ? _playerDrawPose(focus, alpha) : null;
   const focusCar = focusPose ? focusPose.chassis
