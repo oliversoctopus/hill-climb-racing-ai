@@ -455,9 +455,6 @@ export async function runOneStep() {
     _checkPlayerEndOfStep(p);
     if (!p.dead) allDead = false;
   }
-  _recordRenderPoses();
-  // Stepping stops on all-dead; snap (delta 0) so the wreck holds its exact final
-  // pose instead of extrapolating its last velocity.
-  if (allDead) snapRenderPoses();
+  _recordRenderPoses();   // dead cars too — the world keeps stepping their ragdolls
   return allDead;
 }
