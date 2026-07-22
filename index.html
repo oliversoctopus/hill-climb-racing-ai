@@ -153,7 +153,11 @@
   <button id="bp_openexit" title="Toggle the invisible right wall of the 'underworld' (below the terrain): knock it down so you can drive out the right end, press again to put it back. Also restored on Restart/Regenerate (E)">Open Exit</button>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
   <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
-  <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
+</div>
+<!-- Status messages get their own section (min-height reserves the line) so their
+     changing length doesn't reflow the cheat controls above. -->
+<div id="messages_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px; min-height:20px;">
+  💬 <span id="bp_status" style="color:#ffa;"></span>
 </div>
 <details id="advanced_panel" style="max-width:1100px; margin:6px auto;">
 <summary style="cursor:pointer; text-align:center; color:#999; font-size:13px; padding:6px; border-top:1px solid #444;">🐞 Debug — bug probe &amp; physics knobs <span style="color:#666;">(advanced debugging tools — click to expand)</span></summary>
