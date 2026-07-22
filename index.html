@@ -83,12 +83,12 @@
     <tr><td><b>F</b></td><td>Float car up</td></tr>
     <tr><td><b>U</b></td><td>Underworld (drop car to altitude 1.5 m, just above the fall-off line)</td></tr>
     <tr><td><b>X</b></td><td>Stop (momentarily zero all car velocity — horizontal, vertical, rotational)</td></tr>
-    <tr><td><b>E</b></td><td>Open Exit (knock down the underworld's right wall so you can drive out)</td></tr>
+    <tr><td><b>E</b></td><td>Open/Close Exit (toggle the underworld's right wall — knock it down to drive out, press again to seal it)</td></tr>
     <tr><td><b>H</b></td><td>Altimeter (toggle altitude readout)</td></tr>
     <tr><td><b>V</b></td><td>Velocity (toggle speed readout)</td></tr>
     <tr><td><b>C</b></td><td>Distance (toggle current-position score, under the player's score)</td></tr>
-    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
-    <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
+    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; Alt+scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
+    <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; Alt+scroll = thrust</td></tr>
     <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
     <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
     <tr><td><b>P</b></td><td>Pause / Resume</td></tr>
@@ -149,9 +149,9 @@
   <button id="bp_underworld" title="Drop every car to altitude 1.5 m — right above the fall-off line at the bottom of the screen, preserving velocity (U)">Underworld</button>
   <button id="bp_teleport" title="Teleport the car(s) to any position — X = score (distance), Y = altitude in metres">Teleport…</button>
   <button id="bp_stop" title="Momentarily zero all velocity — horizontal, vertical, and rotational — on every car (X)">Stop</button>
-  <button id="bp_openexit" title="Knock down the invisible right wall of the 'underworld' (below the terrain) so you can drive out the right end. Restored on Restart/Regenerate (E)">Open Exit</button>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
+  <button id="bp_openexit" title="Toggle the invisible right wall of the 'underworld' (below the terrain): knock it down so you can drive out the right end, press again to put it back. Also restored on Restart/Regenerate (E)">Open Exit</button>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; Alt+scroll = speed 0–300 (G)"> Flight</label>
+  <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); Alt+scroll = thrust (J)"> Rocket</label>
   <span id="bp_status" style="margin-left:12px; color:#ffa;"></span>
 </div>
 <details id="advanced_panel" style="max-width:1100px; margin:6px auto;">

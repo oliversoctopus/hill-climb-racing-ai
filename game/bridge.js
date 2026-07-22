@@ -20,6 +20,13 @@ export const b2StaticBody = H.b2StaticBody;
 export const perlinSeed = H.perlinSeed;   // p5-noise permutation seeder (_perlinSeed)
 export const AiPolicy = H.AiPolicy;        // { PpoOnnxAgent, ConstantForwardAgent, ACT }
 
+// Ground-edge collision filters. These are `var`s in index.html's compat shim, so
+// (unlike the lexical class/const bindings above) they land on `window` directly —
+// no HCR entry needed. The Open/Close Exit cheat uses them to rebuild the underworld's
+// right wall exactly as Ground.setBodies() made it.
+export const DIRT_MASK = window.DIRT_MASK, DIRT_CATEGORY = window.DIRT_CATEGORY;
+export const GRASS_MASK = window.GRASS_MASK, GRASS_CATEGORY = window.GRASS_CATEGORY;
+
 // `spawningY` and `grassSprites` are genuinely shared with the physics layer:
 // Ground.randomizeGround() WRITES spawningY and READS grassSprites as globals, and
 // the game logic reads/writes spawningY too. They must stay `window` globals; these

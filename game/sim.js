@@ -10,7 +10,8 @@ import {
 import { modeDef, spawnColor } from "./modes.js";
 import { isBelowKillLine } from "./geom.js";
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
-import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG } from "./cheats.js";
+import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG,
+         bpSyncExitButton } from "./cheats.js";
 
 // ---- Score metric --------------------------------------------------------
 // Project score: (max forward px − spawn) / 10, floored, >= 0. Matches eval.py
@@ -258,6 +259,7 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   S.accumSec = 0;
   S.lastWallMs = 0;
   bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars
+  bpSyncExitButton(false);   // the fresh ground has its right wall back → button reads "Open Exit"
   // Keep Zero-G in sync with its checkbox across rebuilds. The fresh world has normal
   // gravity (bpZeroG reset to false), so if the user left Zero-G ticked, re-apply it.
   // bpSetZeroG recaptures the fresh world's real gravity on entry, so bpSavedGravity

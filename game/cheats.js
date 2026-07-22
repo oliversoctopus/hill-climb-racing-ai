@@ -7,7 +7,8 @@ import {
   FLIGHT_ROT_RATE, FLIGHT_ROT_DAMP,
   ROCKET_ROT_RATE, ROCKET_ROT_DAMP, ROCKET_LIN_DAMP,
 } from "./state.js";
-import { Vec2, getSpawningY } from "./bridge.js";
+import { Vec2, getSpawningY,
+         DIRT_MASK, DIRT_CATEGORY, GRASS_MASK, GRASS_CATEGORY } from "./bridge.js";
 import { KILL_LINE_M } from "./geom.js";
 import { _vehicleCoM } from "./sim.js";
 import { humanAction } from "./input.js";
@@ -287,9 +288,12 @@ export function bpStop() {
 // Box2D edge (Ground.js:109-116), so surf_last→bottomRight became a near-vertical wall at
 // the far right (and its grass-layer twin, offset up by grassThickness). The left side is
 // already open (the chain never closes back to surf_0), so removing the right wall lets
-// you drive straight out the right end. Runtime-only + opt-in: it mutates just THIS live
-// world's ground body, never the shared generation path, so training/parity are untouched.
-// A rebuild (Restart / Regenerate / load / mode switch) restores the wall.
+// you drive straight out the right end. The button CYCLES: if the wall is up it comes
+// down; if it's already down, the same two edges are re-added via Ground.addEdge —
+// exactly how setBodies() built them — sealing the exit again. Runtime-only + opt-in: it
+// mutates just THIS live world's ground body, never the shared generation path, so
+// training/parity are untouched. A rebuild (Restart / Regenerate / load / mode switch)
+// restores the wall (sim.buildWithGround calls bpSyncExitButton to re-label the button).
 function _edgeMatches(fix, ax, ay, bx, by, eps) {
   const s = fix.GetShape();
   if (!s || s.m_vertexCount !== 2) return false;
@@ -297,7 +301,13 @@ function _edgeMatches(fix, ax, ay, bx, by, eps) {
   const near = (v, x, y) => Math.abs(v.x - x) <= eps && Math.abs(v.y - y) <= eps;
   return (near(v0, ax, ay) && near(v1, bx, by)) || (near(v0, bx, by) && near(v1, ax, ay));
 }
-export function bpOpenExit() {
+// Keep the button's label honest: "Open Exit" while the wall is up, "Close Exit" once
+// it's down. Rebuilds restore the wall, so buildWithGround calls this with open=false.
+export function bpSyncExitButton(open) {
+  const el = document.getElementById("bp_openexit");
+  if (el) el.textContent = open ? "Close Exit" : "Open Exit";
+}
+export function bpToggleExit() {
   const g = S.ground;
   if (!g || !g.vectors || g.vectors.length < 3 || !g.dirtBody) { bpSetStatus("No terrain — start a run first."); return; }
   const V = g.vectors, n = V.length;
@@ -316,8 +326,17 @@ export function bpOpenExit() {
     }
     for (let k = 0; k < toKill.length; k++) { body.DestroyFixture(toKill[k]); removed++; }
   }
-  if (removed === 0) { bpSetStatus("Underworld exit already open (right wall not found)."); return; }
-  bpSetStatus("Underworld exit opened — the right wall is down. Drive off the right end to leave (Restart/Regenerate restores it).");
+  if (removed > 0) {
+    bpSyncExitButton(true);
+    bpSetStatus("Underworld exit opened — the right wall is down. Drive off the right end to leave (press E again to close it; Restart/Regenerate also restores it).");
+    return;
+  }
+  // Wall not found → the exit is open: put it back. Re-add the dirt edge and its
+  // grass twin exactly as Ground.setBodies() built them (same fixture/filter data).
+  g.addEdge(a, b, DIRT_MASK, DIRT_CATEGORY, false);
+  g.addEdge(new Vec2(a.x, a.y - gt), new Vec2(b.x, b.y - gt), GRASS_MASK, GRASS_CATEGORY, true);
+  bpSyncExitButton(false);
+  bpSetStatus("Underworld exit closed — the right wall is back up (press E again to reopen).");
 }
 
 // ---- Teleport cheat -----------------------------------------------------
