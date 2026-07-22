@@ -375,9 +375,9 @@ document.getElementById("bp_rocket").onchange = function() {
 };
 // Scroll wheel over the canvas adjusts whichever fly cheat is active: Flight speed
 // (0–300) or Rocket thrust. passive:false so we can preventDefault the page scroll.
-// (Alt+scroll is the SIM-speed control below — let it bubble up to that handler.)
+// (Shift+scroll is the SIM-speed control below — let it bubble up to that handler.)
 document.getElementById("stage").addEventListener("wheel", e => {
-  if (e.altKey) return;
+  if (e.shiftKey) return;
   if (S.bpFlight) {
     e.preventDefault();
     const up = e.deltaY < 0;
@@ -395,20 +395,24 @@ document.getElementById("stage").addEventListener("wheel", e => {
     bpSetStatus(`Rocket thrust ${S.rocketAccel} m/s²  (scroll up = faster, down = slower; ${ROCKET_ACCEL_MIN}–${ROCKET_ACCEL_MAX})`);
   }
 }, { passive: false });
-// Alt+Scroll (anywhere on the page) steps the SIM speed through the Speed dropdown's
-// options (0.25x…8x), scroll up = faster. Drives the <select> (set + dispatch change)
-// so the dropdown stays in sync and the one onchange path owns S.simSpeed.
-// passive:false so we can preventDefault the browser's own Alt+wheel behavior.
+// Shift+Scroll (anywhere on the page) steps the SIM speed through the Speed
+// dropdown's options (0.25x…8x), scroll up = faster. Drives the <select> (set +
+// dispatch change) so the one onchange path owns S.simSpeed. Shift, not Alt: a
+// wheel event isn't a key, so releasing Alt after Alt+Scroll focuses the browser
+// menu (and Chrome ignores preventDefault on that). With Shift held, browsers
+// report the wheel delta in deltaX.
 window.addEventListener("wheel", e => {
-  if (!e.altKey) return;
+  if (!e.shiftKey) return;
   e.preventDefault();
+  focusGame();   // keep driving keys on the game, wherever the pointer was
+  const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
   const sel = document.getElementById("speed");
-  const idx = sel.selectedIndex + (e.deltaY < 0 ? 1 : -1);
+  const idx = sel.selectedIndex + (delta < 0 ? 1 : -1);
   if (idx >= 0 && idx < sel.options.length && idx !== sel.selectedIndex) {
     sel.selectedIndex = idx;
     sel.dispatchEvent(new Event("change"));   // runs speed.onchange → S.simSpeed
   }
-  setStatus(`Sim speed ${sel.options[sel.selectedIndex].textContent}  (Alt+scroll up = faster, down = slower)`);
+  setStatus(`Sim speed ${sel.options[sel.selectedIndex].textContent}  (Shift+scroll up = faster, down = slower)`);
 }, { passive: false });
 document.getElementById("bp_float").onclick    = bpFloatCar;
 document.getElementById("bp_underworld").onclick = bpUnderworld;

@@ -59,7 +59,7 @@ Other buttons:
   brand-new random one, respawning everyone.
 - **Pause / Resume** — freezes the sim.
 - **Speed (0.25x–8x)** — simulation speed multiplier (handy for watching the AI;
-  for racing, stay on 1x). **Alt+Scroll** anywhere on the page steps it too
+  for racing, stay on 1x). **Shift+Scroll** anywhere on the page steps it too
   (scroll up = faster). Every speed renders at your display's full frame rate —
   the renderer fills in frames between physics ticks, while the physics itself
   always steps at the game's exact 30 Hz (slow-mo is smooth, not a slideshow).

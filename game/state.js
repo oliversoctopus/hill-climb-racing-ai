@@ -54,7 +54,7 @@ export const S = {
   players: [],            // array of player records (see sim.makePlayer)
   tickCount: 0,
   paused: false,
-  simSpeed: 1,            // set via the Speed dropdown or Alt+Scroll
+  simSpeed: 1,            // set via the Speed dropdown or Shift+Scroll
   aiAgent: null,          // Agent instance from ai_policy.js (PpoOnnxAgent by default)
   mode: "ai",             // key into modes.MODES
 
