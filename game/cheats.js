@@ -10,7 +10,7 @@ import {
 import { Vec2, getSpawningY,
          DIRT_MASK, DIRT_CATEGORY, GRASS_MASK, GRASS_CATEGORY } from "./bridge.js";
 import { KILL_LINE_M } from "./geom.js";
-import { _vehicleCoM } from "./sim.js";
+import { _vehicleCoM, snapRenderPoses } from "./sim.js";
 import { humanAction } from "./input.js";
 
 function _bpHumanPlayer() {
@@ -223,6 +223,7 @@ export function bpFloatCar() {
     }
   }
   if (n === 0) { bpSetStatus("No car to float — start a run first."); return; }
+  snapRenderPoses();   // discontinuous move — don't let the interpolator smear the jump
   bpSetStatus(`Floated ${n > 1 ? `${n} cars` : "car"} up (velocity preserved, camera follows). Enable Zero-G to watch a pure joint/solver spin.`);
 }
 // "Underworld" cheat: teleport every car straight down to a fixed low altitude (1.5 m
@@ -254,6 +255,7 @@ export function bpUnderworld() {
     }
   }
   if (n === 0) { bpSetStatus("No car to send under — start a run first."); return; }
+  snapRenderPoses();   // discontinuous move — don't let the interpolator smear the jump
   bpSetStatus(`Underworld — dropped ${n > 1 ? `${n} cars` : "car"} to altitude ${UNDERWORLD_ALTITUDE_M} m above the fall-off line (velocity preserved). Turn on Invincible to survive down here.`);
 }
 
@@ -387,6 +389,7 @@ export function bpTeleport(score, altitudeM) {
     }
   }
   if (n === 0) { bpSetStatus("No car to teleport — start a run first."); return; }
+  snapRenderPoses();   // discontinuous move — don't let the interpolator smear the jump
   bpSetStatus(`Teleported ${n > 1 ? `${n} cars` : "car"} to score ${Math.round(score)}, altitude ${altitudeM} m (velocity preserved).`);
 }
 export function bpFlag() {

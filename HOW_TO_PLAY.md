@@ -60,7 +60,9 @@ Other buttons:
 - **Pause / Resume** — freezes the sim.
 - **Speed (0.25x–8x)** — simulation speed multiplier (handy for watching the AI;
   for racing, stay on 1x). **Alt+Scroll** anywhere on the page steps it too
-  (scroll up = faster).
+  (scroll up = faster). Every speed renders at your display's full frame rate —
+  the renderer interpolates between physics ticks, while the physics itself
+  always steps at the game's exact 30 Hz (slow-mo is smooth, not a slideshow).
 - **🗺 Terrains** — opens a menu of every map generated this session (newest
   first); click **Load** to re-drive one. Cleared when you close the page.
 - **💾 Saved Terrains** — opens a menu of maps you've saved in this browser.

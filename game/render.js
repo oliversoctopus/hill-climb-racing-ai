@@ -3,12 +3,55 @@
 // line. Mirrors python/renderer.py but supports multiple players with per-player
 // colors. The physics classes' own p5 show() methods are used only by legacy_neat/.
 import {
-  S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE,
+  S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE, SIM_DT,
   AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
 } from "./state.js";
 import { scoreOf, scorePx, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
+
+// ---- Fixed-timestep render interpolation ---------------------------------
+// Physics steps at exactly 30 Hz sim-time (parity-locked); render() runs every rAF.
+// Each frame we draw every body at lerp(prev-tick pose, curr-tick pose, alpha), where
+// alpha is the fraction of a tick sitting in the wall-clock accumulator — so slow sim
+// speeds (and 60 Hz+ displays at 1x) get real in-between frames instead of duplicated
+// ones, at the cost of one tick of visual latency. sim.js records the snapshots
+// (p.rposePrev/rposeCurr) after each step; teleport-style jumps snap them equal.
+// Angles are Box2D's continuous (unwrapped) radians, so a plain lerp is exact — no
+// wrap handling needed (the fastest spin, wheels at 13π rad/s, is 1.36 rad < π/tick).
+function _renderAlpha() {
+  return Math.max(0, Math.min(1, S.accumSec / SIM_DT));
+}
+function _lerpPose(a, b, t) {
+  return { x: a.x + (b.x - a.x) * t,
+           y: a.y + (b.y - a.y) * t,
+           angle: a.angle + (b.angle - a.angle) * t };
+}
+// Lerp a whole car pose (chassis/head/torso/wheels; ghost poses also carry a CoM the
+// readout cheats anchor on). Tolerates a missing part in `a` by holding `b`'s value.
+function _lerpCarPose(a, b, t) {
+  const out = {
+    chassis: _lerpPose(a.chassis || b.chassis, b.chassis, t),
+    head:    _lerpPose(a.head    || b.head,    b.head,    t),
+    torso:   _lerpPose(a.torso   || b.torso,   b.torso,   t),
+    wheels:  [],
+  };
+  for (let i = 0; i < b.wheels.length; i++) {
+    out.wheels.push(_lerpPose(a.wheels[i] || b.wheels[i], b.wheels[i], t));
+  }
+  if (a.com && b.com) {
+    out.com = { x: a.com.x + (b.com.x - a.com.x) * t, y: a.com.y + (b.com.y - a.com.y) * t };
+  } else if (b.com) out.com = b.com;
+  return out;
+}
+// The pose to draw player p at this frame — or null to fall back to live bodies
+// (snapshots not seeded yet, e.g. a world built outside buildWithGround).
+function _playerDrawPose(p, alpha) {
+  const a = p.rposePrev, b = p.rposeCurr;
+  if (!b) return null;
+  if (!a || a === b || alpha >= 1) return b;
+  return _lerpCarPose(a, b, alpha);
+}
 
 // Draws a body's sprite at its world position, rotated by its angle. The sprite-rect
 // (sx, sy, sw, sh) is in body-LOCAL pixel space (relative to the body's center,
@@ -42,33 +85,39 @@ function _drawRotRect(ctx, body, w, h, fill, stroke) {
 }
 
 // Render order mirrors Car.show() in Car.js: person, wheels, then chassis sprite on
-// top (drawn LAST so it covers the wheel-attach points).
-function _drawCar(ctx, car, color, isAI) {
+// top (drawn LAST so it covers the wheel-attach points). `pose` (optional) is an
+// interpolated snapshot from _playerDrawPose — when given, every body is drawn at its
+// lerped pose via _mockBody instead of its live Box2D pose; dims/colors still come
+// from the live car.
+function _drawCar(ctx, car, color, isAI, pose) {
   const assets = S.assets;
   // Torso (rotated solid rect, shirt color)
   const torso = car.person.torso;
   const shirtColor = `rgb(${car.player.shirtColorR},${car.player.shirtColorG},${car.player.shirtColorB})`;
-  _drawRotRect(ctx, torso.body, torso.width, torso.height, shirtColor, "#000");
+  _drawRotRect(ctx, pose ? _mockBody(pose.torso) : torso.body, torso.width, torso.height, shirtColor, "#000");
 
   // Head sprite. AI cars wear Code Bullet's computer head (isCB branch in Person.js:
   // CB uses x=-r-7, person x=-r-8; both y=-r-15, w=h=r*3).
   const head = car.person.head;
   const hr = head.radius;
+  const headBody = pose ? _mockBody(pose.head) : head.body;
   if (isAI && assets.cbhead) {
-    _drawSprite(ctx, assets.cbhead, head.body, -hr - 7, -hr - 15, hr * 3, hr * 3);
+    _drawSprite(ctx, assets.cbhead, headBody, -hr - 7, -hr - 15, hr * 3, hr * 3);
   } else {
-    _drawSprite(ctx, assets.head, head.body, -hr - 8, -hr - 15, hr * 3, hr * 3);
+    _drawSprite(ctx, assets.head, headBody, -hr - 8, -hr - 15, hr * 3, hr * 3);
   }
 
   // Wheel sprites (Wheel.js: x=-r, y=-r, w=h=2*r)
   for (let i = 0; i < car.wheels.length; i++) {
     const w = car.wheels[i];
-    _drawSprite(ctx, assets.wheel, w.body, -w.radius, -w.radius, w.radius * 2, w.radius * 2);
+    const wBody = (pose && pose.wheels[i]) ? _mockBody(pose.wheels[i]) : w.body;
+    _drawSprite(ctx, assets.wheel, wBody, -w.radius, -w.radius, w.radius * 2, w.radius * 2);
   }
 
   // Chassis sprite (Car.js: x=-cw/2-7, y=-ch-20, w=cw+23, h=ch*2+10)
   const cw = car.chassisWidth, ch = car.chassisHeight;
-  _drawSprite(ctx, assets.car, car.chassisBody, -cw/2 - 7, -ch - 20, cw + 23, ch * 2 + 10);
+  _drawSprite(ctx, assets.car, pose ? _mockBody(pose.chassis) : car.chassisBody,
+              -cw/2 - 7, -ch - 20, cw + 23, ch * 2 + 10);
 }
 
 // Draw the car from a recorded pose (meters) instead of live Box2D bodies, by
@@ -367,9 +416,10 @@ function drawCheatHUD(ctx, target, centerX, topY) {
 export function render() {
   const cv = document.getElementById("stage");
   const ctx = cv.getContext("2d");
+  const alpha = _renderAlpha();   // fraction of a tick between the last two physics states
 
   // Human-vs-Human: two live cars on the same terrain, side-by-side split screen.
-  if (modeDef(S.mode).split && !S.ghostPoses && S.players.length >= 2) { renderSplit(ctx); return; }
+  if (modeDef(S.mode).split && !S.ghostPoses && S.players.length >= 2) { renderSplit(ctx, alpha); return; }
 
   // Camera target: prefer the LIVING human so they can always see themselves; once the
   // human dies, hand off to the AI. Falls back to whatever's alive (or any player).
@@ -383,9 +433,21 @@ export function render() {
     }
   }
   if (focus === null && S.players.length > 0) focus = S.players[0];
-  const ghostPose = (S.ghostPoses && S.ghostPoses.length)
-    ? S.ghostPoses[Math.max(0, Math.min(S.ghostIdx, S.ghostPoses.length - 1))] : null;
-  const focusCar = focus ? focus.car.chassisBody.GetPosition() : null;
+  // Ghost pose: interpolate between the previous and current recorded frames with the
+  // same one-tick-behind alpha as live physics; once done, hold the exact final frame
+  // (the accumulator is zeroed then, so raw alpha would show the second-to-last).
+  let ghostPose = null;
+  if (S.ghostPoses && S.ghostPoses.length) {
+    const gi = Math.max(0, Math.min(S.ghostIdx, S.ghostPoses.length - 1));
+    const giPrev = Math.max(0, gi - 1);
+    const gAlpha = S.ghostDone ? 1 : alpha;
+    ghostPose = (giPrev === gi || gAlpha >= 1)
+      ? S.ghostPoses[gi]
+      : _lerpCarPose(S.ghostPoses[giPrev], S.ghostPoses[gi], gAlpha);
+  }
+  const focusPose = focus ? _playerDrawPose(focus, alpha) : null;
+  const focusCar = focusPose ? focusPose.chassis
+                 : (focus ? focus.car.chassisBody.GetPosition() : null);
   let focusX = focusCar ? focusCar.x * SCALE : SPAWN_X;
   if (ghostPose) focusX = ghostPose.chassis.x * SCALE;
   let focusYworld = focusCar ? focusCar.y * SCALE : 0;
@@ -405,7 +467,8 @@ export function render() {
     drawCheatHUD(ctx, cheatTargetFromGhost(ghostPose, S.ghostIdx), CANVAS_WIDTH / 2, 48);
   } else {
     for (var pi = 0; pi < S.players.length; pi++) {
-      _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI);
+      _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
+               _playerDrawPose(S.players[pi], alpha));
     }
     _drawSingleScoreHUD(ctx);   // on-screen score, Code Bullet style (top corners)
     // Center readout cheats for the focused car (altimeter/speed), stacked at y=48.
@@ -457,8 +520,9 @@ export function render() {
 
 // Draw ONE split-screen half (a full standard-width screen): its own camera following
 // `ownP`, the shared world (both cars drawn), and a Human-vs-AI-style score HUD.
-function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppName, ownColor, oppColor) {
-  const fc = ownP.car.chassisBody.GetPosition();
+function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppName, ownColor, oppColor, alpha) {
+  const ownPose = _playerDrawPose(ownP, alpha);
+  const fc = ownPose ? ownPose.chassis : ownP.car.chassisBody.GetPosition();
   _followCamera(cam, fc.x * SCALE, fc.y * SCALE, SPAWN_X);
   S.cameraPanX = cam.panX; S.cameraPanY = cam.panY;   // publish to globals for the draw helpers
 
@@ -467,7 +531,9 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   ctx.translate(offsetX, 0);
 
   _drawScenery(ctx, viewWidth);
-  for (let pi = 0; pi < S.players.length; pi++) _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI);
+  for (let pi = 0; pi < S.players.length; pi++)
+    _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
+             _playerDrawPose(S.players[pi], alpha));
 
   // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
   _hudText(ctx, `${ownName} — Score ${scoreOf(ownP)}`, 24, 48, "left",  ownColor.outline);
@@ -497,12 +563,12 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   ctx.restore();
 }
 
-function renderSplit(ctx) {
+function renderSplit(ctx, alpha) {
   const W = CANVAS_WIDTH;   // each half is one full standard-width screen
   const pL = S.players[0], pR = S.players[1];
   // Left screen shows P1 (own, top-left) vs P2 (opp, top-right); right screen mirrors it.
-  _drawViewport(ctx, S.camL, 0, W, pL, pR, "P1 · WASD",   "P2 · Arrows", HUMAN_L_COLOR, HUMAN_R_COLOR);
-  _drawViewport(ctx, S.camR, W, W, pR, pL, "P2 · Arrows", "P1 · WASD",   HUMAN_R_COLOR, HUMAN_L_COLOR);
+  _drawViewport(ctx, S.camL, 0, W, pL, pR, "P1 · WASD",   "P2 · Arrows", HUMAN_L_COLOR, HUMAN_R_COLOR, alpha);
+  _drawViewport(ctx, S.camR, W, W, pR, pL, "P2 · Arrows", "P1 · WASD",   HUMAN_R_COLOR, HUMAN_L_COLOR, alpha);
 
   // Divider between the two screens.
   ctx.save();

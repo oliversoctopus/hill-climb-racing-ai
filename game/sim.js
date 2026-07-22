@@ -247,6 +247,7 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   }
 
   S.players = spawnPlayers(spawnDx, spawnDy);
+  snapRenderPoses();   // seed the render-interpolation snapshots at the spawn pose
 
   S.tickCount = 0;
   S.cameraPanX = 0;
@@ -367,6 +368,36 @@ export function applyAction(car, action) {
   else car.motorOff();
 }
 
+// ---- Render-pose snapshots (fixed-timestep interpolation) ----------------
+// After every physics tick we snapshot each car's draw pose (capturePose — the same
+// format the ghost replay records) so render() can lerp between the last two ticks
+// and paint smooth in-between frames at rAF rate while physics stays at exactly
+// 30 Hz sim-time. Purely cosmetic: the interpolated poses are never fed back into
+// Box2D, the obs, or the recorder, so browser/training parity is untouched.
+// Roll the snapshots forward one tick: prev <- curr, curr <- live. Dead cars are
+// captured too — their ragdoll keeps moving under physics and is still drawn.
+function _recordRenderPoses() {
+  for (let pi = 0; pi < S.players.length; pi++) {
+    const p = S.players[pi];
+    if (!p.car) continue;
+    const cap = capturePose(p.car);
+    p.rposePrev = p.rposeCurr || cap;
+    p.rposeCurr = cap;
+  }
+}
+// Snap prev = curr = live so the next frames render the CURRENT pose with no sweep.
+// Call after any discontinuous move — spawn/rebuild, the teleporting cheats
+// (Float/Underworld/Teleport), and the final death frame — or the interpolator
+// would draw a one-frame smear across the jump.
+export function snapRenderPoses() {
+  for (let pi = 0; pi < S.players.length; pi++) {
+    const p = S.players[pi];
+    if (!p.car) continue;
+    p.rposeCurr = capturePose(p.car);
+    p.rposePrev = p.rposeCurr;
+  }
+}
+
 export async function runOneStep() {
   // Ghost replay: advance the recorded pose stream one frame; NO physics step.
   // simSpeed/pause still apply (driven by the loop's accumulator). Returns true
@@ -425,5 +456,9 @@ export async function runOneStep() {
     _checkPlayerEndOfStep(p);
     if (!p.dead) allDead = false;
   }
+  _recordRenderPoses();
+  // Stepping stops on all-dead (the loop zeroes the accumulator → alpha 0, which
+  // renders PREV); snap so the held frame is the exact final pose, not one tick back.
+  if (allDead) snapRenderPoses();
   return allDead;
 }
