@@ -11,7 +11,7 @@ import { Vec2, getSpawningY,
          DIRT_MASK, DIRT_CATEGORY, GRASS_MASK, GRASS_CATEGORY } from "./bridge.js";
 import { KILL_LINE_M } from "./geom.js";
 import { _vehicleCoM, snapRenderPoses } from "./sim.js";
-import { humanAction } from "./input.js";
+import { humanAction, flyInput } from "./input.js";
 
 function _bpHumanPlayer() {
   if (!S.players) return null;
@@ -171,7 +171,7 @@ function _applyFlyCheat(flyFn) {
   for (let pi = 0; pi < S.players.length; pi++) {
     const p = S.players[pi]; if (!p.car) continue;
     const input = merged || (p.control === "arrows" ? S.flyKeysArrows : S.flyKeysWASD);
-    flyFn(p.car, input);
+    flyFn(p.car, flyInput(input));   // Reverse-controls cheat mirrors it, if on
   }
 }
 export function applyFlyCheats() {

@@ -4,23 +4,28 @@
 import { S } from "./state.js";
 
 // 0=forward, 1=reverse, 2=off — matches the AI action space (right = forward).
-export function humanAction() {
-  if (S.humanKeys.right && !S.humanKeys.left) return 0;
-  if (S.humanKeys.left && !S.humanKeys.right) return 1;
-  return 2;
-}
-export function humanActionWASD() {
-  if (S.humanKeysWASD.right && !S.humanKeysWASD.left) return 0;
-  if (S.humanKeysWASD.left && !S.humanKeysWASD.right) return 1;
-  return 2;
-}
-// Lone human (Human-only / Human-vs-AI): drive with EITHER arrows or WASD.
-export function humanActionAny() {
-  const left  = S.humanKeys.left  || S.humanKeysWASD.left;
-  const right = S.humanKeys.right || S.humanKeysWASD.right;
+// The Reverse-controls cheat (K) swaps the directions HERE, at read time, rather
+// than in the key handler: toggling it mid-hold would otherwise leave a held key
+// set in one slot and cleared in the other, sticking the motor on.
+function _driveAction(left, right) {
+  if (S.bpReverse) { const t = left; left = right; right = t; }
   if (right && !left) return 0;
   if (left && !right) return 1;
   return 2;
+}
+export function humanAction() { return _driveAction(S.humanKeys.left, S.humanKeys.right); }
+export function humanActionWASD() { return _driveAction(S.humanKeysWASD.left, S.humanKeysWASD.right); }
+// Lone human (Human-only / Human-vs-AI): drive with EITHER arrows or WASD.
+export function humanActionAny() {
+  return _driveAction(S.humanKeys.left  || S.humanKeysWASD.left,
+                      S.humanKeys.right || S.humanKeysWASD.right);
+}
+// Same cheat for the fly control sets (Flight/Rocket): forward↔back and the two
+// rotation directions swap, so every directional input is mirrored in every mode.
+export function flyInput(keys) {
+  return S.bpReverse
+    ? { fwd: keys.back, back: keys.fwd, rotL: keys.rotR, rotR: keys.rotL }
+    : keys;
 }
 
 // Put keyboard focus on the canvas so driving keys never land on the mode <select>
@@ -102,7 +107,7 @@ export function _handleActionKey(e) {
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field
   const map = { i: "bp_invince", z: "bp_zerog", f: "bp_float", u: "bp_underworld",
               x: "bp_stop", e: "bp_openexit", h: "bp_altimeter", v: "bp_speed",
-              c: "bp_distance", g: "bp_flight", j: "bp_rocket", r: "reset_pos",
+              c: "bp_distance", g: "bp_flight", j: "bp_rocket", k: "bp_reverse", r: "reset_pos",
               t: "reset", p: "pause" };
   const id = map[k];
   if (!id) return;

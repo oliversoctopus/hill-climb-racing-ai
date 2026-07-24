@@ -396,6 +396,9 @@ const CHEAT_HUD = [
   { color: "#ff9d6e", size: 20,
     on() { return S.bpRocket; },
     line() { return `🚀 Rocket thrust ${S.rocketAccel} m/s²  (scroll to adjust)`; } },
+  { color: "#ffa0e0", size: 20,   // silent input change — say so on screen (K)
+    on() { return S.bpReverse; },
+    line() { return "🔄 Reversed controls"; } },
 ];
 // Draw every enabled readout for `target`, stacked from topY down. Returns the y after
 // the last line so callers can keep laying out below it if needed.

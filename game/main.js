@@ -373,6 +373,12 @@ document.getElementById("bp_rocket").onchange = function() {
     ? `Rocket mode ON — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate). Thrust ${S.rocketAccel} m/s²; scroll wheel to adjust. Tip: turn on Invincible to survive crashes.`
     : "Rocket mode OFF.");
 };
+document.getElementById("bp_reverse").onchange = function() {
+  S.bpReverse = this.checked;
+  bpSetStatus(S.bpReverse
+    ? "Reverse controls ON — every movement key is mirrored: left↔right while driving, and forward↔back / the two rotate keys in Flight and Rocket mode. Applies to both control sets (both players in Human-vs-Human); the AI drives itself, so it's unaffected."
+    : "Reverse controls OFF.");
+};
 // Scroll wheel over the canvas adjusts whichever fly cheat is active: Flight speed
 // (0–300) or Rocket thrust. passive:false so we can preventDefault the page scroll.
 // (Shift+scroll is the SIM-speed control below — let it bubble up to that handler.)

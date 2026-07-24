@@ -84,7 +84,7 @@ Other buttons:
 Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
 **Z** Zero-G (toggle), **F** float the car(s) up, **U** Underworld (drop the car(s) to
 altitude 1.5 m, just above the fall-off line), **X** stop (zero all velocity), **H** altimeter, **V** velocity,
-**C** distance (current-position score), **R** Restart (same terrain), **T** Regenerate
+**C** distance (current-position score), **K** reverse controls, **R** Restart (same terrain), **T** Regenerate
 terrain, **P** Pause/Resume,
 **Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
 of X), **Esc** close the cheat sheet.
@@ -156,6 +156,12 @@ are unaffected (no retrain implied).
   back up — the button cycles open ↔ closed (its label tracks the state). A
   rebuild — Restart, Regenerate, loading a terrain, or switching mode — also puts
   the wall back.
+- **Reverse controls (K):** mirrors every movement key — **←**/**→** (and **A**/**D**,
+  **S**/**W**) swap while driving, and in **Flight**/**Rocket** mode forward↔back and the
+  two rotate keys swap too. It applies to both control sets, so in Human-vs-Human both
+  players get it; the AI drives itself and is unaffected. A pink **🔄 Reversed controls**
+  line sits with the other on-screen readouts while it's on. Safe to toggle mid-drive —
+  the swap happens when the keys are read, so a held key never sticks.
 - **Teleport:** opens a small window to teleport the car(s) to any position. **X is the
   score** (distance) and **Y is altitude in metres** above the fall-off line — two
   different units, but both are the numbers you already see in the HUD (score + Altimeter).

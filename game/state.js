@@ -105,6 +105,7 @@ export const S = {
   bpDistance: false,      // live current-position score readout, under the player score (C)
   bpFlight: false,        // constant-velocity hover cheat (G)
   bpRocket: false,        // thrust cheat (J)
+  bpReverse: false,       // reversed movement controls cheat (K)
   flightSpeed: 20,        // m/s, scroll-adjustable
   rocketAccel: 20,        // m/s^2, scroll-adjustable
 
