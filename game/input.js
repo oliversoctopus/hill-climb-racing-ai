@@ -38,16 +38,19 @@ export function focusGame() {
 
 function _isFormField(t) { return t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA"); }
 
-// Arrows = right screen / lone human; WASD = left screen (Human-vs-Human). A/S =
-// reverse, D/W = forward (mirrors ←/→). We ignore keys while a form field is focused
-// (e.g. the tick-budget input) so typing works, and preventDefault on the game keys.
+// Arrows = right screen / lone human; WASD = left screen (Human-vs-Human). Both sets
+// drive on either axis: ←/A/S/↓ = reverse, →/D/W/↑ = forward. We ignore keys while a
+// form field is focused (e.g. the tick-budget input) so typing works, and
+// preventDefault on the game keys.
 export function _handleGameKey(e, down) {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  const isDriveKey = (k === "ArrowLeft" || k === "ArrowRight" ||
+  const isDriveKey = (k.startsWith("Arrow") ||
                     k === "a" || k === "s" || k === "d" || k === "w");
   // The mode <select> must never consume a driving key — its native arrow behavior
   // switches modes. If one arrives while it's focused, drop focus to the game and let
   // the key drive; the preventDefault below also stops the select from changing.
+  // All four arrows drive now, so the select loses keyboard navigation entirely —
+  // fine, Alt+1…5 switches modes (see _handleModeKey).
   if (_isFormField(e.target)) {
     if (!(e.target.id === "mode" && isDriveKey)) return;
     if (down) focusGame();
@@ -58,8 +61,8 @@ export function _handleGameKey(e, down) {
   switch (k) {
     case "ArrowLeft":  S.humanKeys.left      = down; S.flyKeysArrows.rotL = down; e.preventDefault(); break;
     case "ArrowRight": S.humanKeys.right     = down; S.flyKeysArrows.rotR = down; e.preventDefault(); break;
-    case "ArrowUp":                                  S.flyKeysArrows.fwd  = down; e.preventDefault(); break;
-    case "ArrowDown":                                S.flyKeysArrows.back = down; e.preventDefault(); break;
+    case "ArrowUp":    S.humanKeys.right     = down; S.flyKeysArrows.fwd  = down; e.preventDefault(); break;
+    case "ArrowDown":  S.humanKeys.left      = down; S.flyKeysArrows.back = down; e.preventDefault(); break;
     case "a": S.humanKeysWASD.left  = down; S.flyKeysWASD.rotL = down; e.preventDefault(); break;
     case "s": S.humanKeysWASD.left  = down; S.flyKeysWASD.back = down; e.preventDefault(); break;
     case "d": S.humanKeysWASD.right = down; S.flyKeysWASD.rotR = down; e.preventDefault(); break;

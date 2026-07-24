@@ -40,12 +40,13 @@ Switching modes rebuilds the world with fresh terrain.
 
 ## 4. Controls (human driving)
 
-- **→ (Right arrow)** — motor forward
-- **← (Left arrow)** — motor reverse
+- **→ (Right arrow)** or **↑ (Up arrow)** — motor forward
+- **← (Left arrow)** or **↓ (Down arrow)** — motor reverse
 - **Nothing held** — motor off (coast)
 
 In **Human vs Human (split)** mode the left car uses **WASD** instead: **D** (or
 **W**) = forward, **A** (or **S**) = reverse. The right car keeps the arrow keys.
+Both sets drive on either axis, so the two are exact mirrors of each other.
 
 That's the entire action space — it's on/off only, exactly what the AI has.
 No brakes, no throttle scaling.
@@ -156,8 +157,8 @@ are unaffected (no retrain implied).
   back up — the button cycles open ↔ closed (its label tracks the state). A
   rebuild — Restart, Regenerate, loading a terrain, or switching mode — also puts
   the wall back.
-- **Reverse controls (K):** mirrors every movement key — **←**/**→** (and **A**/**D**,
-  **S**/**W**) swap while driving, and in **Flight**/**Rocket** mode forward↔back and the
+- **Reverse controls (K):** mirrors every movement key — **←**/**→**, **↑**/**↓**,
+  **A**/**D** and **S**/**W** swap while driving, and in **Flight**/**Rocket** mode forward↔back and the
   two rotate keys swap too. It applies to both control sets, so in Human-vs-Human both
   players get it; the AI drives itself and is unaffected. A pink **🔄 Reversed controls**
   line sits with the other on-screen readouts while it's on. Safe to toggle mid-drive —
