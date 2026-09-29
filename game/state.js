@@ -23,6 +23,13 @@ export const SIM_DT = 1.0 / FRAME_RATE;
 // AI no-progress timeout — matches python/env.py:244 (the agent trained against it).
 export const STUCK_TIMEOUT_TICKS = 500;
 
+// Natural fly-off window, from leaving the terrain edge: distance gained within it is the
+// "fly-off" part of a score, anything later is "after fly-off" (cheats only). Measured
+// 2026-09-29: deployed AI fly-offs 0.8–2.0 s (median 1.6, n=15); analytic worst case over
+// 400 maps (highest lip, motor top speed launched up the steepest final ramp) 4.7 s.
+export const FLYOFF_GRACE_SEC = 5;
+export const FLYOFF_GRACE_TICKS = FLYOFF_GRACE_SEC * FRAME_RATE;
+
 // --- Player colors ---
 export const AI_COLOR    = { outline: "#5cf", torso: "#3c5ac8", shirtR: 80,  shirtG: 120, shirtB: 200 };
 export const HUMAN_COLOR = { outline: "#fc5", torso: "#c8783c", shirtR: 200, shirtG: 120, shirtB: 60  };

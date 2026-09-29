@@ -1,7 +1,7 @@
 // Simulation core: world/terrain/car construction, the per-tick step, death
 // checks, and the small vehicle-geometry helpers the rest of the app shares.
 import {
-  S, SCALE, SPAWN_X, FRAME_RATE, SIM_DT, MAX_SESSION_TERRAINS,
+  S, SCALE, SPAWN_X, FRAME_RATE, SIM_DT, MAX_SESSION_TERRAINS, FLYOFF_GRACE_TICKS,
 } from "./state.js";
 import {
   Car, Ground, Box2D, Vec2, b2World, b2StaticBody, perlinSeed,
@@ -22,6 +22,19 @@ import { mapKeyOf, mapRecord, mapRecordAll, globalRecord, commitRun, cheatsActiv
 // and Code Bullet's Player.js. `scorePx` takes a raw x in px; `scoreOf` a player.
 export function scorePx(px) { return Math.max(0, Math.floor((px - SPAWN_X) / 10)); }
 export function scoreOf(p) { return scorePx(p.maxDistPx); }
+// A finished run's score split three ways: up to the finish line (what the finish time
+// measures), the natural fly-off (until FLYOFF_GRACE after leaving the terrain), and anything
+// after that (only cheats get there — a clean car is dead by then). Null if unfinished.
+// Floored differences, so the parts always sum to the score.
+export function scoreParts(p) {
+  if (!p.beatTick) return null;
+  const total = scoreOf(p), toFinish = Math.min(total, scorePx(p.finishLinePx));
+  const graceEnd = p.graceEndPx != null ? scorePx(p.graceEndPx) : total;
+  // Airborne time off the edge, until death or the end of the window (0 = never left the lip).
+  const endTick = Math.min(p.deadTick || S.tickCount, p.leftLipTick + FLYOFF_GRACE_TICKS);
+  const flyoffSec = p.leftLipTick ? Math.max(0, endTick - p.leftLipTick) / FRAME_RATE : 0;
+  return { toFinish, flyoff: graceEnd - toFinish, after: total - graceEnd, flyoffSec };
+}
 // Signed current-position distance (score units), NOT clamped at 0 — so driving or
 // teleporting behind the spawn line reads negative. Only the live Distance readout uses
 // this; the canonical Score (scoreOf) stays floored at 0.
@@ -175,7 +188,15 @@ export function _checkPlayerEndOfStep(p) {
   // (distance - smoothness; the launch lip) — the same line as "completion" and what
   // the backtrack search calls "beating the game". Human-vs-Human awards the win to
   // whoever crosses FIRST (smallest beatTick).
-  if (!p.beatTick && S.ground && p.maxDistPx >= S.ground.distance - S.ground.smoothness) p.beatTick = S.tickCount;
+  if (!p.beatTick && S.ground && p.maxDistPx >= S.ground.distance - S.ground.smoothness) {
+    p.beatTick = S.tickCount;
+    p.finishLinePx = S.ground.distance - S.ground.smoothness;
+  }
+  // Natural fly-off window: starts when the car leaves the terrain (passes the cliff edge
+  // just past the finish line — a car can sit on the lip for a while first), lasts
+  // FLYOFF_GRACE; distance after it is "after fly-off" (see scoreParts).
+  if (p.beatTick && !p.leftLipTick && S.ground && p.maxDistPx > S.ground.distance) p.leftLipTick = S.tickCount;
+  if (p.leftLipTick && p.graceEndPx == null && S.tickCount - p.leftLipTick >= FLYOFF_GRACE_TICKS) p.graceEndPx = p.maxDistPx;
   const fellOffWorld = !S.bpInvincible && isBelowKillLine(ypx);   // fell below the screen into the void
   if (!S.bpInvincible && (p.car.player.kindaDead || isBelowKillLine(ypx))) p.dead = true;
   if (p.isAI && !S.bpInvincible && p.stuckCount > T.aiStuckTicks) p.dead = true;
@@ -239,7 +260,7 @@ function spawnPlayers(spawnDx, spawnDy) {
 export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   S.worldGen += 1;  // invalidates any in-flight runOneStep awaiting from the old world
   // An abandoned human run (Restart/Regenerate mid-drive) still counts toward records.
-  for (const p of S.players) if (!p.isAI && !p.dead) commitRun(p, scoreOf(p));
+  for (const p of S.players) if (!p.isAI && !p.dead) commitRun(p, scoreOf(p), scoreParts(p));
   S.bpZeroG = false;  // fresh world has normal gravity; clear any stale float state
   S.world = new b2World(new Vec2(0, 10), false);
   S.listener = makeContactListener(S.world);
@@ -481,7 +502,7 @@ export async function runOneStep() {
     if (p.dead) continue;
     const hadBeat = p.beatTick;
     _checkPlayerEndOfStep(p);
-    if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p));
+    if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p), scoreParts(p));
     if (!p.dead) allDead = false;
   }
   _recordRenderPoses();   // dead cars too — the world keeps stepping their ragdolls

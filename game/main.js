@@ -316,8 +316,8 @@ function renderRecordsMenu() {
         c.className = "rec-cheat"; c.textContent = `⚠ ${text}${top ? " 🏆" : ""}`; c.title = tip;
         cell.appendChild(c);
       };
-      if (r.all.scoreCheated) cheatLine(sc, String(r.all.score), r.globalAllScore,
-        `best score incl. cheats${r.globalAllScore ? " on any map" : ""} — set by a cheated run`);
+      if (r.all.scoreCheated) cheatLine(sc, String(r.all.score) + (r.all.scoreParts && r.all.scoreParts.after ? " ↗" : ""),
+        r.globalAllScore, `best score incl. cheats${r.globalAllScore ? " on any map" : ""} — set by a cheated run`);
       if (r.all.timeCheated) cheatLine(tm, fmtTime(r.all.time), r.globalAllTime,
         `fastest finish incl. cheats${r.globalAllTime ? " on any map" : ""} — set by a cheated run`);
     }
@@ -333,8 +333,39 @@ function renderRecordsMenu() {
     acts.append(load, del);
     row.append(id, nm, sc, tm, acts);
     list.appendChild(row);
+
+    // Score breakdown (finished runs only): ▸ toggle on the score, three parts when open.
+    const parts = [];
+    if (r.bestScoreParts) parts.push(["Clean best", r.bestScore, r.bestScoreParts, false]);
+    if (show && r.all.scoreCheated && r.all.scoreParts) parts.push(["Incl. cheats", r.all.score, r.all.scoreParts, true]);
+    if (!parts.length) continue;
+    const open = _recExpanded.has(r.key);
+    const tog = document.createElement("span");
+    tog.className = "rec-expand"; tog.textContent = open ? "▾" : "▸";
+    tog.dataset.recExpand = r.key;
+    tog.title = "Score breakdown: to the finish · fly-off · after the fly-off";
+    sc.prepend(tog);
+    if (!open) continue;
+    const box = document.createElement("div");
+    box.className = "rec-parts";
+    for (const [lbl, total, pt, cheated] of parts) {
+      const line = document.createElement("div");
+      if (cheated) line.className = "cheat";
+      line.innerHTML = `<b></b> <span class="p-fin"></span> to finish · <span class="p-fly"></span> fly-off · ` +
+                       `<span class="p-aft"></span> after fly-off`;
+      line.querySelector("b").textContent = `${lbl} ${cheated ? "⚠" : ""}${total} =`;
+      line.querySelector(".p-fin").textContent = pt.toFinish;
+      // flyoffSec is missing on breakdowns recorded before it existed.
+      line.querySelector(".p-fly").textContent = pt.flyoff + (pt.flyoffSec != null ? ` (${pt.flyoffSec.toFixed(1)} s)` : "");
+      const aft = line.querySelector(".p-aft");
+      aft.textContent = pt.after ? `↗${pt.after}` : "0";
+      aft.classList.toggle("hot", pt.after > 0);
+      box.appendChild(line);
+    }
+    list.appendChild(box);
   }
 }
+const _recExpanded = new Set();   // map keys whose score breakdown is open (this session)
 document.getElementById("records_sort").onclick = (e) => {
   const k = e.target && e.target.dataset && e.target.dataset.sort;
   if (!k || !REC_SORTS[k]) return;
@@ -359,7 +390,11 @@ document.getElementById("records_close").onclick = () => { document.getElementBy
 document.getElementById("records_list").onclick = (e) => {
   const el = e.target;
   if (!el || !el.dataset) return;
-  if (el.dataset.recLoad !== undefined) {
+  if (el.dataset.recExpand !== undefined) {
+    const k = el.dataset.recExpand;
+    if (_recExpanded.has(k)) _recExpanded.delete(k); else _recExpanded.add(k);
+    renderRecordsMenu();
+  } else if (el.dataset.recLoad !== undefined) {
     const src = recordMapSource(el.dataset.recLoad);
     if (!src) { setStatus("That map's terrain wasn't stored, so it can't be loaded."); return; }
     loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(el.dataset.recLoad) });

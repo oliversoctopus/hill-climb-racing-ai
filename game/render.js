@@ -6,7 +6,7 @@ import {
   S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE, SIM_DT,
   AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
 } from "./state.js";
-import { scoreOf, scorePx, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
+import { scoreOf, scorePx, scoreParts, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
 import { drawBackground, fillDirt, drawFinishFlag, drawBestFlag, finishPx } from "./scenery.js";
@@ -508,6 +508,14 @@ function _timeBadge(p) {
   if (r.mapTime && S.recStart && S.recStart.map.bestTime != null) return "MAP BEST";
   return _cheatBadge(r, r.allGlobalTime, r.allMapTime, S.recStart && S.recStart.all.time != null);
 }
+// Score breakdown row for a finished run that kept going past the natural fly-off
+// (cheats only): to finish · fly-off · after, the last part red.
+function _partsRows(p) {
+  const pt = p && scoreParts(p);
+  if (!pt || !pt.after) return [];
+  return [["Split: to finish · fly-off · after", [[`${pt.toFinish}  ·  ${pt.flyoff} (${pt.flyoffSec.toFixed(1)}s)  ·  `, "#c9d4e2"],
+                                                  [`↗${pt.after}`, CHEAT_RED]]]];
+}
 function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeconds(p)) : "DNF"}`; }
 
 // End card for the single-screen modes, built once when everyone is dead.
@@ -530,20 +538,20 @@ function _buildEndCard() {
     }
     if (!card.title) { card.title = humanWins ? "YOU WIN!" : "AI WINS"; card.color = humanWins ? WIN : LOSE; }
     if (S.runTainted) card.subtitle = taintNote;
-    card.rows.push(["You  (score · time)", _runLine(hum), _scoreBadge(hum) || _timeBadge(hum)]);
-    card.rows.push(["AI  (score · time)", _runLine(ai)]);
+    card.rows.push(["You  (score · time)", _runLine(hum), _scoreBadge(hum) || _timeBadge(hum)], ..._partsRows(hum));
+    card.rows.push(["AI  (score · time)", _runLine(ai)], ..._partsRows(ai));
     card.rows.push(..._recRows());
   } else if (hum) {
     card.title = hum.beatTick ? "YOU BEAT THE GAME!" : "CRASHED!";
     card.color = hum.beatTick ? WIN : LOSE;
     card.subtitle = S.runTainted ? taintNote : (S.currentTerrainName || "");
-    card.rows.push(["Score", String(scoreOf(hum)), _scoreBadge(hum)]);
+    card.rows.push(["Score", String(scoreOf(hum)), _scoreBadge(hum)], ..._partsRows(hum));
     if (hum.beatTick) card.rows.push(["Finish time", fmtTime(runSeconds(hum)), _timeBadge(hum)]);
     card.rows.push(..._recRows());
   } else if (ai) {
     card.title = ai.beatTick ? "AI BEAT THE GAME!" : "AI CRASHED";
     card.color = ai.beatTick ? WIN : LOSE;
-    card.rows.push(["Score", String(scoreOf(ai))]);
+    card.rows.push(["Score", String(scoreOf(ai))], ..._partsRows(ai));
     card.rows.push(["Time", ai.beatTick ? fmtTime(runSeconds(ai)) : `${fmtTime(runSeconds(ai))} (crashed)`]);
   }
   return card;
@@ -760,8 +768,8 @@ function renderSplit(ctx, alpha, now) {
   const rect = drawEndCard(ctx, stageW / 2, CANVAS_HEIGHT / 2 + 20, {
     title, color: "#ffd27f", subtitle: S.runTainted ? "Cheats were on — cheat records only" : sub,
     width: 600, alpha: a,
-    rows: [["P1 · WASD  (score · time)", _runLine(pL), _scoreBadge(pL) || _timeBadge(pL)],
-           ["P2 · Arrows  (score · time)", _runLine(pR), _scoreBadge(pR) || _timeBadge(pR)],
+    rows: [["P1 · WASD  (score · time)", _runLine(pL), _scoreBadge(pL) || _timeBadge(pL)], ..._partsRows(pL),
+           ["P2 · Arrows  (score · time)", _runLine(pR), _scoreBadge(pR) || _timeBadge(pR)], ..._partsRows(pR),
            ..._recRows()],
     hint: [["R", "Rematch"], ["T", "New map"]],
   });

@@ -95,6 +95,14 @@ card to see it: the extra rows/tiles appear next to the clean ones, and any valu
 cheated run set is shown in **red with ⚠** (new ones get a red **CHEAT RECORD** badge).
 Maps holding only cheated records are hidden while the box is unticked.
 
+Score (farthest distance) and finish time (the moment you cross the line) are separate
+records, so one run can hold both. For a finished run the score splits into **to the
+finish** (what the time measures), **fly-off** (until 5 s after the car leaves the end of
+the terrain — a real launch off the lip is over by then) and **after fly-off** (only reachable with
+cheats like Rocket/Flight). Click **▸** next to a record score in the Records menu to see
+the split; a **↗** marks scores with distance after the fly-off, and the end card shows
+the split automatically for such runs.
+
 ### Toolbar
 
 - **↺ Restart** — puts the car(s) back at the start of the *current* map, no new

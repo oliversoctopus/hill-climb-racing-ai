@@ -282,6 +282,15 @@ details.tune-sec .toggle { font-size: 12px; padding: 5px 10px; color: var(--mute
 .rec-row .rec-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .rec-row .trophy { font-size: 12px; margin-right: 4px; }
 .rec-row .rec-stat .rec-cheat { font-family: var(--ui); }
+.rec-row .rec-expand { cursor: pointer; color: var(--muted); font-family: var(--ui); font-size: 15px; margin-right: 6px;
+  vertical-align: middle; }
+.rec-row .rec-expand:hover { color: var(--text); }
+.rec-parts { margin: -2px 0 6px 44px; padding: 6px 10px; border-left: 2px solid var(--line); font-size: 12px;
+  color: var(--muted); line-height: 1.7; }
+.rec-parts b { color: var(--text); }
+.rec-parts .cheat b { color: #ff6b6b; }
+.rec-parts span { color: var(--text); font-weight: 800; }
+.rec-parts .hot { color: #ff6b6b; }
 .terrain-row.rec-head { background: none !important; color: var(--muted); font-size: 11px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.8px; padding-top: 0; padding-bottom: 2px; }
 .rec-head span:nth-child(3), .rec-head span:nth-child(4) { text-align: right; }

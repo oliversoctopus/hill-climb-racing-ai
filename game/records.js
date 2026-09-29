@@ -36,7 +36,10 @@ function _load() {
   return { version: 1, nextId: 1, maps: {} };
 }
 // The incl.-cheats track, seeded from a map's clean bests.
-function _cleanAll(m) { return { score: m.bestScore, scoreCheated: false, time: m.bestTime, timeCheated: false }; }
+function _cleanAll(m) {
+  return { score: m.bestScore, scoreCheated: false, scoreParts: m.bestScoreParts || null,
+           time: m.bestTime, timeCheated: false };
+}
 function _save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
 
 // Best score / fastest finish over all maps, with the key of the map holding each.
@@ -175,6 +178,7 @@ export function listRecordMaps() {
   const d = _load(), saved = _savedNames(), stored = _loadMaps(), g = _global(d), ga = _globalAll(d);
   return Object.entries(d.maps)
     .map(([key, m]) => ({ key, id: m.id, label: _label(d, key, saved), bestScore: m.bestScore,
+                          bestScoreParts: m.bestScoreParts || null,
                           bestTime: m.bestTime, loadable: !!stored[key],
                           clean: m.bestScore > 0 || m.bestTime != null, all: m.all,
                           globalScore: key === g.bestScoreKey, globalTime: key === g.bestTimeKey,
@@ -215,8 +219,9 @@ export function cheatsActive() {
 // to call on finish, on death, and again when the run is abandoned. New-record flags
 // are OR-ed onto p.newRec for the end card (clean: mapScore/globalScore/...; incl.-cheats
 // track: allMapScore/allGlobalScore/...). A map only gets an entry (id + stored terrain)
-// once a run actually sets something on it.
-export function commitRun(p, score) {
+// once a run actually sets something on it. `parts` (sim.scoreParts: to finish / fly-off /
+// after fly-off, or null if unfinished) is stored with each score record it sets.
+export function commitRun(p, score, parts) {
   if (!p || p.isAI || !S.mapKey) return;
   const cheated = S.runTainted;
   const time = p.beatTick ? p.beatTick / FRAME_RATE : null;
@@ -235,11 +240,11 @@ export function commitRun(p, score) {
   const m = d.maps[S.mapKey];
   const nr = p.newRec || (p.newRec = {});
   nr.cheated = cheated;
-  if (betterScore) { m.bestScore = score; nr.mapScore = true; }
+  if (betterScore) { m.bestScore = score; m.bestScoreParts = parts || null; nr.mapScore = true; }
   if (betterTime) { m.bestTime = time; nr.mapTime = true; }
   if (betterScore && score > g.bestScore) nr.globalScore = true;
   if (betterTime && (g.bestTime == null || time < g.bestTime)) nr.globalTime = true;
-  if (allScore) { m.all.score = score; m.all.scoreCheated = cheated; nr.allMapScore = true; }
+  if (allScore) { m.all.score = score; m.all.scoreCheated = cheated; m.all.scoreParts = parts || null; nr.allMapScore = true; }
   if (allTime) { m.all.time = time; m.all.timeCheated = cheated; nr.allMapTime = true; }
   if (allScore && score > ga.score) nr.allGlobalScore = true;
   if (allTime && (ga.time == null || time < ga.time)) nr.allGlobalTime = true;
