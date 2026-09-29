@@ -13,6 +13,7 @@ import {
   capturePose, scorePx,
 } from "./sim.js";
 import { modeLabel } from "./modes.js";
+import { syncGroundDims, tuneTick } from "./tune.js";
 import { setStatus, _setupHiDPI } from "./main.js";
 
 // ---- Best of X -----------------------------------------------------------
@@ -90,6 +91,7 @@ export async function runBestOfX() {
         const act = await S.aiAgent.act({ car: p.car, ground: S.ground, scale: SCALE });
         actions.push(act);
         applyAction(p.car, act);
+        tuneTick();
         S.world.Step(1.0 / FRAME_RATE, 10, 10);
         S.world.ClearForces();
         S.tickCount += 1;
@@ -229,6 +231,7 @@ function buildSearchWorld(srcGround, sY) {
   setSpawningY(sY);
   S.ground = new Ground(S.world);
   S.ground.cloneFrom(srcGround);
+  syncGroundDims(S.ground, srcGround);
   S.ground.setBodies(S.world);
   const p = makePlayer(S.aiAgent, AI_COLOR);
   S.players = [p];
@@ -252,6 +255,7 @@ async function btRoll(p, startAidx, burst, opts) {
     const act = (t < burst.length) ? burst[t]
             : await S.aiAgent.act({ car: p.car, ground: S.ground, scale: SCALE });
     applyAction(p.car, act);
+    tuneTick();
     S.world.Step(1.0 / FRAME_RATE, 10, 10);
     S.world.ClearForces();
     S.tickCount += 1; actions.push(act); t += 1; opts.ticks.n += 1;
@@ -345,6 +349,7 @@ function jsReplaySegments(p, segments) {
     restoreCarState(p, seg.start.car);
     for (let ai = 0; ai < seg.actions.length; ai++) {
       applyAction(p.car, seg.actions[ai]);
+      tuneTick();
       S.world.Step(1.0 / FRAME_RATE, 10, 10); S.world.ClearForces();
       if (!dims) dims = { chassis_w: p.car.chassisWidth, chassis_h: p.car.chassisHeight,
                           wheel_r: p.car.wheels[0].radius, torso_w: p.car.person.torso.width,

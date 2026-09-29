@@ -166,7 +166,8 @@ export function fmtTime(sec) {
 
 // Anything that makes a run easier than a straight drive.
 export function cheatsActive() {
-  return S.bpInvincible || S.bpZeroG || S.bpFlight || S.bpRocket || S.simSpeed < 1 || S.bpPhysModified;
+  return S.bpInvincible || S.bpZeroG || S.bpFlight || S.bpRocket || S.simSpeed < 1 || S.bpPhysModified
+      || !!(S.ground && S.ground.tuned);   // a playground-generated map (flat/short/...)
 }
 
 // Fold a human player's run into the stored records. Idempotent (max/min), so it's safe

@@ -46,12 +46,13 @@ export function drawPlayerPanel(ctx, x, y, o) {
   return y + h;
 }
 
-// markers: [{ frac, color }]; best: frac or null. Centered at cx.
+// markers: [{ frac, color }]; best: frac or null. Track + finish cap centered at cx.
 export function drawProgressBar(ctx, cx, y, w, markers, best) {
-  const x = cx - w / 2;
+  const CAP = 9;                       // checkered cap sits just past the track end
+  const x = cx - (w + CAP) / 2;
   ctx.save();
   ctx.fillStyle = "rgba(14,20,34,0.6)";
-  _rr(ctx, x - 14, y - 12, w + 28, 24, 12); ctx.fill();   // 14px pad clears the finish cap
+  _rr(ctx, x - 12, y - 12, w + CAP + 24, 24, 12); ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   _rr(ctx, x, y - 3, w, 6, 3); ctx.fill();
   const lead = markers.length ? markers[0] : null;

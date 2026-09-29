@@ -1,7 +1,7 @@
 // Simulation core: world/terrain/car construction, the per-tick step, death
 // checks, and the small vehicle-geometry helpers the rest of the app shares.
 import {
-  S, SCALE, SPAWN_X, FRAME_RATE, SIM_DT, STUCK_TIMEOUT_TICKS, MAX_SESSION_TERRAINS,
+  S, SCALE, SPAWN_X, FRAME_RATE, SIM_DT, MAX_SESSION_TERRAINS,
 } from "./state.js";
 import {
   Car, Ground, Box2D, Vec2, b2World, b2StaticBody, perlinSeed,
@@ -9,8 +9,10 @@ import {
 } from "./bridge.js";
 import { modeDef, spawnColor } from "./modes.js";
 import { isBelowKillLine } from "./geom.js";
+import { T, tuneTick, tuneGroundPre, tuneGroundPost, terrainTuned, syncGroundDims,
+         tuneOnBuild } from "./tune.js";
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
-import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG,
+import { recordTick, applyFlyCheats, bpSetZeroG,
          bpSyncExitButton } from "./cheats.js";
 import { mapKeyOf, mapRecord, globalRecord, commitRun, cheatsActive, refreshRecordsStrip,
          recordMapLabel } from "./records.js";
@@ -86,7 +88,7 @@ export function makeContactListener(w) {
     if (!udA || !udB) return;
 
     function killViaHead(headBody) {
-      if (S.bpInvincible) return;   // bug probe: don't split the car / kill on head-ground contact
+      if (S.bpInvincible || !T.headKills) return;   // cheat / playground rule: head hits don't kill
       if (headBody.GetJointList() == null) return;
       const c = headBody.GetJointList().other.GetJointList().other.GetUserData();
       if (!c) return;
@@ -176,7 +178,7 @@ export function _checkPlayerEndOfStep(p) {
   if (!p.beatTick && S.ground && p.maxDistPx >= S.ground.distance - S.ground.smoothness) p.beatTick = S.tickCount;
   const fellOffWorld = !S.bpInvincible && isBelowKillLine(ypx);   // fell below the screen into the void
   if (!S.bpInvincible && (p.car.player.kindaDead || isBelowKillLine(ypx))) p.dead = true;
-  if (p.isAI && !S.bpInvincible && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
+  if (p.isAI && !S.bpInvincible && p.stuckCount > T.aiStuckTicks) p.dead = true;
   if (p.dead) p.deadTick = S.tickCount;   // freezes the run timer
   // Freeze ONLY on a fall-off-the-world death: head-hit ragdolls stay on-screen and
   // are fine to keep tumbling, but a car that dropped off the edge would fall forever
@@ -198,14 +200,18 @@ export function rollAcceptableGround() {
   const tmp = new b2World(new Vec2(0, 10), false);
   perlinSeed(Math.floor(Math.random() * 0x7FFFFFFF));
   let g = new Ground(tmp);
+  tuneGroundPre(g);
   g.randomizeGround();
   let rerolls = 0;
-  while (g.isTooSteep() && rerolls < 1000) {
+  const cap = terrainTuned() ? 200 : 1000;   // odd spacings can fail the gate a lot
+  while (g.isTooSteep() && rerolls < cap) {
     perlinSeed(Math.floor(Math.random() * 0x7FFFFFFF));
     g = new Ground(tmp);
+    tuneGroundPre(g);
     g.randomizeGround();
     rerolls += 1;
   }
+  tuneGroundPost(g);   // physics playground: hilliness + spawn height
   return { ground: g, spawningY: getSpawningY() };
 }
 
@@ -241,12 +247,14 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
     setSpawningY(sourceSpawningY);
     S.ground = new Ground(S.world);
     S.ground.cloneFrom(sourceGround);
+    syncGroundDims(S.ground, sourceGround);
     S.ground.setBodies(S.world);
   } else {
     const roll = rollAcceptableGround();
     setSpawningY(roll.spawningY);
     S.ground = new Ground(S.world);
     S.ground.cloneFrom(roll.ground);
+    syncGroundDims(S.ground, roll.ground);
     S.ground.setBodies(S.world);
     recordSessionTerrain();   // remember this fresh map for the Terrains dropdown
   }
@@ -272,7 +280,7 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   // it, so render's interpolation adds no display latency (see render.js).
   S.accumSec = SIM_DT;
   S.lastWallMs = 0;
-  bpApplyPhys();   // re-apply any bug-probe physics knobs to the freshly built cars
+  tuneOnBuild();   // physics playground: the new car now matches the size knobs
   bpSyncExitButton(false);   // the fresh ground has its right wall back
   // Keep Zero-G in sync with its checkbox across rebuilds. The fresh world has normal
   // gravity (bpZeroG reset to false), so if the user left Zero-G ticked, re-apply it.
@@ -315,7 +323,7 @@ export function makeSourceFromTrack(track) {
 // rebuild the world on the SAME map (Restart) without generating a new one.
 export function currentGroundSource() {
   return { vectors: S.ground.vectors.map(v => new Vec2(v.x, v.y)),
-           grassPositions: S.ground.grassPositions.slice() };
+           grassPositions: S.ground.grassPositions.slice(), tuned: S.ground.tuned };
 }
 
 // ---- Session terrains ----------------------------------------------------
@@ -458,7 +466,7 @@ export async function runOneStep() {
     applyAction(p.car, action);
   }
   if (S.replayActions !== null) S.replayIdx += 1;
-  bpApplyMotorOverride();   // bug probe: re-apply scaled motor speed/torque before the step
+  tuneTick();               // physics playground: motor overrides + neck spring before the step
   applyFlyCheats();         // cheat: WASD/arrow Flight (constant vel) or Rocket (thrust)
 
   S.world.Step(1.0 / FRAME_RATE, 10, 10);

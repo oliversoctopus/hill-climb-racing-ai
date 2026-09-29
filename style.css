@@ -113,7 +113,7 @@ input[type=number] { width: 90px; }
 }
 .chip .lbl { color: var(--muted); }
 .label { color: var(--muted); font-weight: 700; font-size: 13px; }
-.cta { margin-left: auto; }
+.push-right { margin-left: auto; }   /* Pause/Fullscreen + the CTA hug the right edge */
 .cta button.primary { padding: 10px 18px; font-size: 15px; }
 details.pop { position: relative; }
 details.pop > summary {
@@ -210,6 +210,32 @@ details.pop[open] > .pop-body {
 #advanced_panel .dbg { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 2; }
 #advanced_panel .dbg input { width: 64px; padding: 3px 6px; }
 #bp_live { font-family: ui-monospace, monospace; color: #9f9; }
+/* Physics playground (game/tune.js builds the rows) */
+.tune-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px; }
+.tune-preset-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.tune-presets button { padding: 5px 9px; font-size: 12px; }
+.dbg-lbl { color: var(--muted); font-size: 12px; font-weight: 700; width: 100%; }
+details.tune-sec { border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; background: var(--panel); }
+details.tune-sec > summary {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 8px 10px; cursor: pointer; font-weight: 800; font-size: 13px; color: var(--text, #e6edf7);
+}
+details.tune-sec[open] > summary { border-bottom: 1px solid var(--line); }
+.tune-badge { font-size: 11px; font-weight: 800; color: var(--accent-2); }
+.tune-badge.warn { color: #ffc933; }
+.tune-row {
+  display: grid; grid-template-columns: 1fr 104px 54px; align-items: center; gap: 8px;
+  padding: 3px 10px; font-size: 12px; color: var(--muted); font-weight: 700;
+}
+.tune-row .tl { cursor: default; }
+.tune-row input[type=range] { width: 100%; accent-color: var(--accent-2); }
+.tune-row input[type=text] { width: 100%; padding: 3px 5px; font-size: 12px; text-align: right; }
+.tune-row.pending .tl::after, div.pending > .toggle .tl::after { content: " ↺"; color: #ffc933; }
+details.tune-sec .toggle { font-size: 12px; padding: 5px 10px; color: var(--muted); }
+.tune-row.mod .tl, details.tune-sec div.mod > .toggle { color: var(--accent-2); }
+.tune-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px 8px;
+  font-size: 11px; color: var(--muted); }
+.tune-foot button { padding: 4px 8px; font-size: 11px; margin-left: auto; }
 .scrim {
   position: fixed; inset: 0; background: rgba(4, 7, 14, 0.5); z-index: 55; opacity: 0; pointer-events: none;
   transition: opacity 0.2s;
@@ -259,6 +285,6 @@ details.pop[open] > .pop-body {
 @media (max-width: 900px) {
   .records { grid-template-columns: repeat(2, 1fr); }
   .records-title { grid-column: 1 / -1; }
-  .cta { margin-left: 0; }
+  .push-right { margin-left: 0; }
   .brand-name { font-size: 20px; }
 }

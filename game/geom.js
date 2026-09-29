@@ -4,6 +4,7 @@
 // sign errors easy to introduce, so the two sign conventions live here, named, in
 // one place instead of as bare subtractions scattered through render + sim.
 import { CANVAS_HEIGHT, SCALE } from "./state.js";
+import { T } from "./tune.js";
 
 // Height of a point above the ground line directly below it, in whatever unit the
 // inputs are (meters or px, as long as they match). Positive = the point is ABOVE
@@ -28,7 +29,7 @@ export function altitudeAboveKillLine(pointY) {
 
 // A car has fallen off the world once its chassis drops below the bottom of the
 // screen (the death line the policy was trained against — chassis y*30 > 720).
-// Argument is in PIXELS.
+// Argument is in PIXELS. The physics playground can push the line deeper (default 24 m).
 export function isBelowKillLine(yPx) {
-  return yPx > CANVAS_HEIGHT;
+  return yPx > T.killLineM * SCALE;
 }

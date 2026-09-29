@@ -50,8 +50,6 @@
     <div class="group">
       <button id="reset_pos" title="Put the car(s) back at the start of this same map (R)">↺ Restart <kbd>R</kbd></button>
       <button id="reset" title="Generate a brand-new random map (T)">🎲 New map <kbd>T</kbd></button>
-      <button id="pause" title="Pause / Resume (P)">Pause</button>
-      <button id="fullscreen_btn" title="Fullscreen the game screen (Esc to exit)">⛶ Fullscreen</button>
     </div>
     <div class="sep"></div>
     <label class="group label" title="Simulation speed (Shift+Scroll also steps this). Slow-mo runs aren't recorded.">Speed
@@ -70,6 +68,10 @@
       <button id="terrains_btn" class="ghost" title="Maps generated this session — click to re-load one">🗺 History</button>
       <button id="saved_btn" class="ghost" title="Maps you've saved in this browser — save, load, or delete">💾 Saved</button>
       <button id="records_btn" class="ghost" title="Every map you hold a record on — load one to beat it">🏆 Records</button>
+    </div>
+    <div class="group push-right">
+      <button id="pause" title="Pause / Resume (P)">Pause</button>
+      <button id="fullscreen_btn" class="primary" title="Fullscreen the game screen (Esc to exit)">⛶ Fullscreen</button>
     </div>
     <div class="group cta">
       <button id="backtrack_run" class="primary" title="Run the rewind-and-retry search on THIS map, then replay it — it flies off the end if it can, otherwise it shows the best run it managed.">▶ Watch the AI beat this map</button>
@@ -157,29 +159,25 @@
   <span id="bp_status"></span>
 
   <details id="advanced_panel">
-    <summary>🐞 Debug — bug probe &amp; physics knobs</summary>
+    <summary>🧪 Physics playground &amp; debug</summary>
+    <div class="tune-presets">
+      <span class="dbg-lbl">Presets (they stack):</span>
+      <div id="tune_presets" class="tune-preset-btns"></div>
+      <button id="tune_resetall" class="danger">Reset all</button>
+    </div>
+    <div id="tune_root"></div>
+    <p class="note">Changes affect every car, the AI included (it was trained on stock physics, so expect chaos). Any change keeps the run off the records. Double-click a knob's name to reset it.</p>
+    <h3>Debugging only</h3>
+    <div class="dbg">
+      Spin-investigation presets:<br>
+      <button id="bp_unmask" class="danger" title="No damping + stiff under-damped suspension: exposes the suspension-resonance spin">🔥 Unmask</button>
+      <button id="bp_motorspin" class="danger" title="Motor speed ×2: reproduces the sustained CCW spin">🌀 Motor-spin</button>
+    </div>
     <div class="dbg">
       Bug probe <span>(use <b>You drive</b>)</span>:<br>
-      <button id="bp_flag" style="background:#a63;">⚑ Flag reproduced</button>
+      <button id="bp_flag" title="Mark this moment in the recording so it is easy to find later" style="background:#a63;">⚑ Flag unusual</button>
       <button id="bp_download">Download recording</button><br>
       <span id="bp_live"></span>
-    </div>
-    <div class="dbg">
-      Physics knobs (all cars, incl. the AI):<br>
-      chassis angDamp <input id="bp_chassisdamp" type="number" step="0.05" value="0.1"><br>
-      wheel angDamp <input id="bp_wheeldamp" type="number" step="0.1" value="1.8"><br>
-      susp freq <input id="bp_suspfreq" type="number" step="5" value="70">
-      susp damp <input id="bp_suspdamp" type="number" step="1" value="25"><br>
-      <button id="bp_applyphys">Apply</button>
-      <button id="bp_unmask" class="danger">🔥 Unmask</button>
-      <button id="bp_resetphys">Reset</button>
-    </div>
-    <div class="dbg">
-      Motor &amp; friction (motor SPEED is the spin lever):<br>
-      motor speed × <input id="bp_motorspeed" type="number" step="0.5" value="1">
-      torque × <input id="bp_motortorque" type="number" step="0.5" value="1"><br>
-      wheel friction <input id="bp_wheelfric" type="number" step="0.1" value="1.5">
-      <button id="bp_motorspin" class="danger">🌀 Motor-spin</button>
     </div>
   </details>
 </aside>
@@ -441,6 +439,39 @@ function color() { return null; }
      They live in the classic global LEXICAL scope (class/const) and are otherwise
      invisible to module scope. The physics files MUST stay classic — they are loaded
      verbatim into V8 for training and by legacy_neat/. See game/bridge.js. -->
+<script>
+// Physics-playground size knobs (game/tune.js fills in the rest of HCR_TUNE). Browser-
+// only construction wrappers — the physics files stay untouched, and at the defaults
+// (all ×1) every car is built exactly as the unmodified classes build it.
+window.HCR_TUNE = { chassisLen: 1, chassisHt: 1, wheelSize: 1, wheelbase: 1, driverSize: 1 };
+(function () {
+  const TU = window.HCR_TUNE;
+  // Car's constructor assigns these then builds from them: scale on assignment. (Get/set
+  // only — Box2d.js replaces Object.defineProperty with a polyfill that ignores `value`.)
+  [["chassisWidth", "chassisLen"], ["chassisHeight", "chassisHt"], ["wheelSize", "wheelSize"]].forEach(([prop, key]) => {
+    const slot = "_hcr_" + prop;
+    Object.defineProperty(Car.prototype, prop, {
+      get() { return this[slot]; },
+      set(v) { this[slot] = v * TU[key]; },
+    });
+  });
+})();
+const _WheelBase = Wheel, _PersonBase = Person, _CarBase = Car;
+Wheel = class extends _WheelBase {
+  constructor(x, y, r, chassisBody, world) {
+    const k = window.HCR_TUNE.wheelbase;   // move the mount point toward/away from the chassis centre
+    if (k !== 1 && chassisBody) { const cx = chassisBody.GetPosition().x * SCALE; x = cx + (x - cx) * k; }
+    super(x, y, r, chassisBody, world);
+  }
+};
+Person = class extends _PersonBase {
+  constructor(x, y, w, h, world) { const k = window.HCR_TUNE.driverSize; super(x, y, w * k, h * k, world); }
+};
+Car = class extends _CarBase {
+  constructor(...a) { super(...a); if (window.HCR_onCar) window.HCR_onCar(this); }
+};
+</script>
+
 <script>
 window.HCR = {
   Car: Car, Ground: Ground,

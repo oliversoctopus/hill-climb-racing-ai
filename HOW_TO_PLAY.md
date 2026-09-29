@@ -83,7 +83,8 @@ row has **Load** (rebuilds
 the exact same map, grass and all) and **Delete** (drops that map's records; asks
 first). Each stored map takes ~16 KB of browser storage. Only human runs
 count, and a run doesn't count if you used a cheat (Invincible, Zero-G, Flight,
-Rocket, Float, Underworld, Stop, Exit, Teleport, the debug physics knobs) or
+Rocket, Float, Underworld, Stop, Exit, Teleport, any physics-playground knob, or
+a map generated with changed terrain knobs) or
 slow-mo below 1× — the HUD shows a red **run not recorded** tag when that happens.
 Reverse controls is a handicap, so it still counts.
 
@@ -219,15 +220,26 @@ are unaffected (no retrain implied).
 - **Current distance (C):** your **current-position** score, shown as an extra line
   in the player's panel. The score is your best (high-water mark); this is where you
   are *now*, so it drops if you roll backward.
-- **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
-- **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
-  the active physics knobs) for offline analysis.
-- **Physics knobs (live, runtime-only):** chassis/wheel angular damping,
-  suspension spring freq/damp, **motor speed×**, **motor torque×**, and wheel
-  friction. **Apply** pushes the values; **Reset** restores stock. Two presets:
-  **🔥 Unmask** (strip damping → exposes a suspension-resonance instability) and
-  **🌀 Motor-spin** (motor speed ×2 → the chassis winds into a sustained
-  counter-spin while driving — motor *speed*, not torque/friction, is that lever).
+- **🧪 Physics playground** (the collapsible panel at the bottom of the Tools drawer):
+  every tweakable physics value, in collapsible sections — World (gravity down/sideways),
+  Car body, Wheels, Motor (top speed ×, separate **rear** and **front** torque, so 0 on
+  one gives front/rear-wheel drive), Suspension (stiffness, damping, ride height, travel
+  limit), Driver (head/torso density, seat spring, seat tilt limits, neck limit + spring),
+  **Sizes & shapes**, Rules (head-hit death, fall-off depth, AI stuck timeout) and
+  Terrain. Each number is a slider plus a box for exact values; double-click a knob's
+  name to reset it. Most knobs apply **live** to every car, the AI included (it was
+  trained on stock physics, so expect chaos). **Sizes & shapes** apply on **Restart (R)**
+  and terrain hilliness/length/spacing on a **New map (T)** — the section shows
+  "↺ restart to apply" / "🎲 new map to apply" and a message reminds you. Presets
+  (Moon, Ice rink, Trampoline, Monster truck, Bobblehead) stack; **Reset all** restores
+  stock. Values reset on page reload.
+- **Debugging only** (bottom of that panel): **🔥 Unmask** (strip damping + stiff,
+  under-damped suspension → exposes a suspension-resonance instability) and
+  **🌀 Motor-spin** (motor speed ×2 → the chassis winds into a sustained counter-spin
+  while driving — motor *speed*, not torque/friction, is that lever), then the bug
+  probe: **⚑ Flag unusual** marks the current tick so the moment is easy to find, and
+  **Download recording** exports `hcr_bugrun_*.json` (ticks + flags + terrain + every
+  playground knob) for offline analysis.
 
 ## Troubleshooting
 

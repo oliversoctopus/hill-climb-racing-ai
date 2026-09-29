@@ -18,9 +18,10 @@ import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, d
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
-  bpTeleport, bpTeleportCurrent, bpFlag, bpDownload, bpApplyPhys, _bpNum, showToast,
+  bpTeleport, bpTeleportCurrent, bpFlag, bpDownload, showToast,
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
+import { buildTunePanel, setTune, resetTune, TUNE_PRESETS } from "./tune.js";
 
 export function setStatus(s) { document.getElementById("status").textContent = s; }
 
@@ -616,42 +617,22 @@ document.getElementById("teleport_close").onclick = () => {
 };
 document.getElementById("bp_flag").onclick     = bpFlag;
 document.getElementById("bp_download").onclick = bpDownload;
-document.getElementById("bp_applyphys").onclick = () => { bpApplyPhys(true); };
-["bp_chassisdamp", "bp_wheeldamp", "bp_suspfreq", "bp_suspdamp"].forEach(id => {
-  document.getElementById(id).onchange = () => { bpApplyPhys(true); };
-});
-document.getElementById("bp_unmask").onclick = () => {
-  // Drive the suspension instability hard so the latent spin becomes obvious: no
-  // chassis/wheel angular damping + a very stiff, under-damped suspension spring. It's
-  // resonance-driven, so DRIVE around / over bumps to provoke it.
-  document.getElementById("bp_chassisdamp").value = "0";
-  document.getElementById("bp_wheeldamp").value   = "0";
-  document.getElementById("bp_suspfreq").value    = "200";
-  document.getElementById("bp_suspdamp").value    = "0.3";
-  bpApplyPhys(true);
-};
-document.getElementById("bp_resetphys").onclick = () => {
-  document.getElementById("bp_chassisdamp").value = "0.1";
-  document.getElementById("bp_wheeldamp").value   = "1.8";
-  document.getElementById("bp_suspfreq").value    = "70";
-  document.getElementById("bp_suspdamp").value    = "25";
-  document.getElementById("bp_wheelfric").value   = "1.5";
-  document.getElementById("bp_motorspeed").value  = "1";
-  document.getElementById("bp_motortorque").value = "1";
-  bpApplyPhys(true);
-};
-document.getElementById("bp_wheelfric").onchange = () => { bpApplyPhys(true); };
-document.getElementById("bp_motorspeed").onchange =
-document.getElementById("bp_motortorque").onchange = () => {
-  bpSetStatus(`motor speed ×${_bpNum("bp_motorspeed", 1)} torque ×${_bpNum("bp_motortorque", 1)} (applied live while driving)`);
-};
-document.getElementById("bp_motorspin").onclick = () => {
-  // Double the motor's target speed — the lever that reproduces the sustained CCW spin.
-  // Drive / floor it (into a hill, or after a flip) to provoke it.
-  document.getElementById("bp_motorspeed").value  = "2";
-  document.getElementById("bp_motortorque").value = "1";
-  bpSetStatus("Motor-spin: motor speed ×2 — drive & floor it to provoke the sustained CCW spin.");
-};
+// Physics playground: knob sections generated from tune.TUNE_SPEC.
+buildTunePanel(document.getElementById("tune_root"), bpSetStatus);
+const _presetBox = document.getElementById("tune_presets");
+for (const pr of TUNE_PRESETS) {
+  const btn = document.createElement("button");
+  btn.textContent = pr.name;
+  btn.onclick = () => setTune(pr.vals);
+  _presetBox.appendChild(btn);
+}
+document.getElementById("tune_resetall").onclick = () => resetTune();
+// Spin-investigation presets (debug only). Unmask: no angular damping + a very stiff,
+// under-damped suspension — resonance-driven, so DRIVE over bumps to provoke it.
+document.getElementById("bp_unmask").onclick = () =>
+  setTune({ chassisAngDamp: 0, wheelAngDamp: 0, suspFreq: 200, suspDamp: 0.3 });
+// Motor-spin: double the motor's target speed — floor it to provoke the sustained CCW spin.
+document.getElementById("bp_motorspin").onclick = () => setTune({ motorSpeed: 2 });
 
 // Keybinds cheat-sheet overlay.
 document.getElementById("keybinds_btn").onclick = () => {

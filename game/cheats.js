@@ -12,6 +12,7 @@ import { Vec2, getSpawningY,
 import { KILL_LINE_M } from "./geom.js";
 import { _vehicleCoM, snapRenderPoses } from "./sim.js";
 import { humanAction, flyInput } from "./input.js";
+import { T } from "./tune.js";
 
 function _bpHumanPlayer() {
   if (!S.players) return null;
@@ -67,58 +68,6 @@ export function recordTick() {
   if (S.bpRecord.length > BP_MAX_LEN) S.bpRecord.shift();
   const live = document.getElementById("bp_live");
   if (live) live.textContent = `angVel ${rec.angVel.toFixed(3)} rad/s  angle ${rec.angle.toFixed(2)}${S.bpZeroG ? "  [ZERO-G]" : ""}`;
-}
-
-export function _bpNum(id, dflt) {
-  const el = document.getElementById(id);
-  if (!el || el.value === "") return dflt;
-  const v = parseFloat(el.value);
-  return isNaN(v) ? dflt : v;
-}
-// Apply the physics knobs to every car's bodies/joints. Box2D reads
-// frequency/damping fresh each step, so this retunes live without a rebuild.
-// Defaults match the source (Car.js angDamp 0.1; Wheel.js susp 70/25; wheel angDamp
-// 1.8) so an untouched panel changes nothing.
-export function bpApplyPhys(announce) {
-  const cars = _bpAllCars();
-  if (!cars.length) return;
-  const cad = _bpNum("bp_chassisdamp", 0.1), wad = _bpNum("bp_wheeldamp", 1.8);
-  const sf = _bpNum("bp_suspfreq", 70), sd = _bpNum("bp_suspdamp", 25);
-  const wf = _bpNum("bp_wheelfric", 1.5);
-  for (let ci = 0; ci < cars.length; ci++) {
-    const c = cars[ci];
-    try { c.chassisBody.SetAngularDamping(cad); c.chassisBody.SetAwake(true); } catch (e) {}
-    for (let i = 0; i < c.wheels.length; i++) {
-      const w = c.wheels[i];
-      try { w.body.SetAngularDamping(wad); w.body.SetAwake(true); } catch (e) {}
-      try { if (w.distJoint) { w.distJoint.SetFrequency(sf); w.distJoint.SetDampingRatio(sd); } } catch (e) {}
-      try { for (let f = w.body.GetFixtureList(); f; f = f.m_next) f.SetFriction(wf); } catch (e) {}
-      try { if (w.rimBody) w.rimBody.SetAwake(true); } catch (e) {}
-    }
-  }
-  const modified = (cad !== 0.1) || (wad !== 1.8) || (sf !== 70) || (sd !== 25) || (wf !== 1.5);
-  S.bpPhysModified = modified;
-  if (announce || modified)
-    bpSetStatus(`Physics: chassisDamp=${cad} wheelDamp=${wad} suspFreq=${sf} suspDamp=${sd} wheelFric=${wf}${modified ? "  (MODIFIED)" : ""}`);
-}
-
-// Motor speed/torque overrides. motorOn() resets these to base (700/350, ±13π)
-// every tick, so this re-applies the scale AFTER applyAction, before world.Step.
-export function bpApplyMotorOverride() {
-  const ts = _bpNum("bp_motortorque", 1), ss = _bpNum("bp_motorspeed", 1);
-  if (ts === 1 && ss === 1) return;
-  S.runTainted = true;
-  const cars = _bpAllCars();
-  for (let ci = 0; ci < cars.length; ci++) {
-    const ws = cars[ci].wheels;
-    for (let i = 0; i < ws.length; i++) {
-      const j = ws[i].joint;
-      if (j && j.m_enableMotor) {
-        try { j.SetMaxMotorTorque(j.GetMaxMotorTorque() * ts); } catch (e) {}
-        try { j.SetMotorSpeed(j.GetMotorSpeed() * ss); } catch (e) {}
-      }
-    }
-  }
 }
 
 // ---- Flight & Rocket cheats ---------------------------------------------
@@ -209,7 +158,7 @@ export function bpSetZeroG(on) {
   } else {
     // Fall back to normal gravity if the saved value is missing or (defensively) zero.
     let gv = S.bpSavedGravity;
-    if (!gv || (gv.x === 0 && gv.y === 0)) gv = new Vec2(0, 10);
+    if (!gv) gv = new Vec2(T.gravityX, T.gravityY);
     S.world.SetGravity(gv);
     S.bpZeroG = false;
     bpSetStatus("Zero-G OFF — gravity restored.");
@@ -425,10 +374,7 @@ export function bpDownload() {
       frame_rate: FRAME_RATE, scale: SCALE, spawn_x: SPAWN_X,
       spawning_y: getSpawningY(),
       mode: S.mode,
-      phys: { chassisAngDamp: _bpNum("bp_chassisdamp", 0.1), wheelAngDamp: _bpNum("bp_wheeldamp", 1.8),
-              suspFreq: _bpNum("bp_suspfreq", 70), suspDamp: _bpNum("bp_suspdamp", 25),
-              wheelFric: _bpNum("bp_wheelfric", 1.5), motorSpeedScale: _bpNum("bp_motorspeed", 1),
-              motorTorqueScale: _bpNum("bp_motortorque", 1) },
+      phys: { ...T },   // every physics-playground knob (game/tune.js)
       n_ticks: S.bpRecord.length, flags: S.bpFlags
     },
     ground: gv, ticks: S.bpRecord
