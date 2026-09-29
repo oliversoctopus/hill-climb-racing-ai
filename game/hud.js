@@ -124,16 +124,24 @@ export function drawEndCard(ctx, cx, cy, o) {
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     _rr(ctx, x + 28, yy - 24, w - 56, 30, 8); ctx.fill();
     _text(ctx, label, x + 42, yy - 3, `700 15px ${UI_FONT}`, "#c9d4e2");
-    _text(ctx, value, x + w - 42, yy - 2, `22px ${DISPLAY_FONT}`, "#fff", "right");
+    // value: a string, or [[text, color], ...] segments (e.g. a red cheated part).
+    const segs = Array.isArray(value) ? value : [[value, "#fff"]];
+    ctx.font = `22px ${DISPLAY_FONT}`;
+    const vw = segs.reduce((a, [t]) => a + ctx.measureText(t).width, 0);
+    let vx = x + w - 42 - vw;
+    for (const [t, c] of segs) {
+      _text(ctx, t, vx, yy - 2, `22px ${DISPLAY_FONT}`, c, "left");
+      vx += ctx.measureText(t).width;
+    }
     if (badge) {
-      ctx.font = `22px ${DISPLAY_FONT}`;
-      const vw = ctx.measureText(value).width;
+      // badge: a string (gold) or { text, bg, fg }.
+      const b = typeof badge === "string" ? { text: badge, bg: "#ffc933", fg: "#4a3200" } : badge;
       ctx.font = `800 11px ${UI_FONT}`;
-      const bw = ctx.measureText(badge).width + 14;
+      const bw = ctx.measureText(b.text).width + 14;
       const bx = x + w - 42 - vw - 10 - bw;
-      ctx.fillStyle = "#ffc933";
+      ctx.fillStyle = b.bg;
       _rr(ctx, bx, yy - 20, bw, 19, 9); ctx.fill();
-      _text(ctx, badge, bx + bw / 2, yy - 6, `800 11px ${UI_FONT}`, "#4a3200", "center");
+      _text(ctx, b.text, bx + bw / 2, yy - 6, `800 11px ${UI_FONT}`, b.fg, "center");
     }
   }
   if (o.hint) {
@@ -141,6 +149,7 @@ export function drawEndCard(ctx, cx, cy, o) {
     _drawKeyHint(ctx, cx, yy - 6, o.hint);
   }
   ctx.restore();
+  return { x, y, w, h };
 }
 
 // "R Restart · T New map" with key-cap boxes; hint = [[key, label], ...].

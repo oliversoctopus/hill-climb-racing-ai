@@ -12,7 +12,8 @@ import { altitudeAboveKillLine } from "./geom.js";
 import { drawBackground, fillDirt, drawFinishFlag, drawBestFlag, finishPx } from "./scenery.js";
 import { drawPlayerPanel, drawProgressBar, drawTag, drawReadout, drawEndCard, PANEL_W } from "./hud.js";
 import { emitDust, stepFx, shake, shakeOffset, burstConfetti, drawDust, drawConfetti, clearFx } from "./fx.js";
-import { runSeconds, fmtTime, mapRecord, globalRecord } from "./records.js";
+import { runSeconds, fmtTime, mapRecord, globalRecord, mapRecordAll, globalRecordAll, showCheatRecords
+} from "./records.js";
 
 // ---- Fixed-timestep render smoothing -------------------------------------
 // Physics steps at a fixed 30 Hz; render() runs every rAF, drawing each body at
@@ -289,6 +290,14 @@ function _recValue(r) {
   if (!r.bestScore) return "—";
   return `${r.bestScore}  ·  ${r.bestTime != null ? fmtTime(r.bestTime) : "no finish"}`;
 }
+// Incl.-cheats track value as coloured segments: a part a cheated run set is red + ⚠.
+const CHEAT_RED = "#ff6b6b";
+function _recValueAll(a) {
+  if (!a.score) return "—";
+  const part = (txt, cheated) => [cheated ? `⚠${txt}` : txt, cheated ? CHEAT_RED : "#fff"];
+  return [part(String(a.score), a.scoreCheated), ["  ·  ", "#fff"],
+          a.time != null ? part(fmtTime(a.time), a.timeCheated) : ["no finish", "#fff"]];
+}
 // Panel contents for one live player.
 function _panelFor(p, label, color) {
   const lines = [];
@@ -300,7 +309,7 @@ function _panelFor(p, label, color) {
            dead: p.dead && !p.beatTick, finished: !!p.beatTick };
 }
 function _taintTag(ctx, x, y) {
-  if (S.runTainted) drawTag(ctx, x, y, "⚠ CHEATS / SLOW-MO USED · RUN NOT RECORDED", "rgba(190,50,50,0.9)");
+  if (S.runTainted) drawTag(ctx, x, y, "⚠ CHEATS / SLOW-MO USED · CHEAT RECORDS ONLY", "rgba(190,50,50,0.9)");
 }
 function _progressFor(ctx, cx, players) {
   const markers = players.map(p => ({ frac: _progressFrac(p.maxDistPx), color: p.color.outline }));
@@ -469,20 +478,35 @@ let _recCache = null;   // record rows, read once per end card (not every frame)
 function _recRows() {
   if (_recCache) return _recCache;
   const m = mapRecord(S.mapKey), g = globalRecord();
-  return (_recCache = [["Best on this map  (score · finish)", _recValue(m)],
-                       ["Best on any map  (score · finish)", _recValue(g)]]);
+  _recCache = [["Best on this map  (score · finish)", _recValue(m)],
+               ["Best on any map  (score · finish)", _recValue(g)]];
+  if (showCheatRecords()) {
+    const ga = globalRecordAll();
+    _recCache.push(["Incl. cheats · this map", _recValueAll(mapRecordAll(S.mapKey))],
+                   ["Incl. cheats · any map", _recValueAll({ score: ga.score, scoreCheated: ga.scoreCheated,
+                                                             time: ga.time, timeCheated: ga.timeCheated })]);
+  }
+  return _recCache;
+}
+// Cheat-track badges (red), shown only with "Show cheat records" on.
+const CHEAT_BADGE = t => ({ text: t, bg: CHEAT_RED, fg: "#3a0000" });
+function _cheatBadge(r, glob, map, hadPrev) {
+  if (!r.cheated || !showCheatRecords()) return null;
+  if (glob) return CHEAT_BADGE("CHEAT RECORD");
+  if (map && hadPrev) return CHEAT_BADGE("CHEAT MAP BEST");
+  return null;
 }
 function _scoreBadge(p) {
   const r = p.newRec || {};
   if (r.globalScore) return "NEW RECORD";
   if (r.mapScore && S.recStart && S.recStart.map.bestScore > 0) return "MAP BEST";
-  return null;
+  return _cheatBadge(r, r.allGlobalScore, r.allMapScore, S.recStart && S.recStart.all.score > 0);
 }
 function _timeBadge(p) {
   const r = p.newRec || {};
   if (r.globalTime) return "NEW RECORD";
   if (r.mapTime && S.recStart && S.recStart.map.bestTime != null) return "MAP BEST";
-  return null;
+  return _cheatBadge(r, r.allGlobalTime, r.allMapTime, S.recStart && S.recStart.all.time != null);
 }
 function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeconds(p)) : "DNF"}`; }
 
@@ -492,7 +516,7 @@ function _buildEndCard() {
   for (const p of S.players) { if (p.isAI) ai = p; else hum = p; }
   const WIN = "#7dffa6", LOSE = "#ff8a80", GOLD = "#ffd27f";
   const card = { rows: [], hint: HINT };
-  const taintNote = "Cheats were on — this run wasn't recorded";
+  const taintNote = "Cheats were on — counts only toward cheat records";
   if (S.mode === "vs" && hum && ai) {
     let humanWins;
     if (hum.beatTick || ai.beatTick) {
@@ -538,12 +562,34 @@ export function render() {
     if (!S.ghostPoses) for (const p of S.players) emitDust(p, dt);
   }
   _detectEvents(now);
+  _toggleWant = null;
 
   // Human-vs-Human: two live cars on the same terrain, side-by-side split screen.
   if (modeDef(S.mode).split && !S.ghostPoses && S.players.length >= 2) renderSplit(ctx, alpha, now);
   else _renderSingle(ctx, alpha, now);
   drawConfetti(ctx);
+  _syncEndToggle();
 }
+
+// "Show cheat records" checkbox: a DOM overlay just under the canvas-drawn end card
+// (only on cards that list human records). Card rect is in logical canvas units.
+let _toggleWant = null;
+function _syncEndToggle() {
+  const el = document.getElementById("endcard_cheats");
+  if (!el) return;
+  if (!_toggleWant) { if (el.style.display !== "none") el.style.display = "none"; return; }
+  const cv = document.getElementById("stage");
+  const k = cv.clientWidth / _toggleWant.lw;
+  const t = _toggleWant;
+  el.style.display = "flex";
+  el.style.left = `${cv.offsetLeft + (t.x + t.w / 2) * k}px`;
+  el.style.top = `${cv.offsetTop + (t.y + t.h + 12) * k}px`;
+  el.style.opacity = String(t.a);
+  const cb = el.querySelector("input");
+  if (cb.checked !== showCheatRecords()) cb.checked = showCheatRecords();
+}
+// Toggling (here or in the Records menu) rebuilds the cached card text.
+document.addEventListener("hcr-cheat-records-toggled", () => { _endCard = null; _recCache = null; });
 
 function _renderSingle(ctx, alpha, now) {
   // Camera target: prefer the LIVING human so they can always see themselves; once the
@@ -626,7 +672,8 @@ function _renderSingle(ctx, alpha, now) {
   if (!_endCard) _endCard = _buildEndCard();
   ctx.fillStyle = `rgba(6,10,20,${(0.4 * a).toFixed(3)})`;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  drawEndCard(ctx, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20, { ..._endCard, alpha: a });
+  const rect = drawEndCard(ctx, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20, { ..._endCard, alpha: a });
+  if (S.players.some(p => !p.isAI)) _toggleWant = { ...rect, a, lw: CANVAS_WIDTH };
 }
 
 // Draw ONE split-screen half (a full standard-width screen): its own camera following
@@ -710,13 +757,15 @@ function renderSplit(ctx, alpha, now) {
   const stageW = stageWidth();
   ctx.fillStyle = `rgba(6,10,20,${(0.4 * a).toFixed(3)})`;
   ctx.fillRect(0, 0, stageW, CANVAS_HEIGHT);
-  drawEndCard(ctx, stageW / 2, CANVAS_HEIGHT / 2 + 20, {
-    title, color: "#ffd27f", subtitle: S.runTainted ? "Cheats were on — not recorded" : sub, width: 600, alpha: a,
+  const rect = drawEndCard(ctx, stageW / 2, CANVAS_HEIGHT / 2 + 20, {
+    title, color: "#ffd27f", subtitle: S.runTainted ? "Cheats were on — cheat records only" : sub,
+    width: 600, alpha: a,
     rows: [["P1 · WASD  (score · time)", _runLine(pL), _scoreBadge(pL) || _timeBadge(pL)],
            ["P2 · Arrows  (score · time)", _runLine(pR), _scoreBadge(pR) || _timeBadge(pR)],
            ..._recRows()],
     hint: [["R", "Rematch"], ["T", "New map"]],
   });
+  _toggleWant = { ...rect, a, lw: stageW };
 }
 
 // DOM bits that change per step: the "Replaying run…" chip while a ghost plays.

@@ -85,8 +85,15 @@ first). Each stored map takes ~16 KB of browser storage. Only human runs
 count, and a run doesn't count if you used a cheat (Invincible, Zero-G, Flight,
 Rocket, Float, Underworld, Stop, Exit, Teleport, any physics-playground knob, or
 a map generated with changed terrain knobs) or
-slow-mo below 1× — the HUD shows a red **run not recorded** tag when that happens.
+slow-mo below 1× — the HUD shows a red **cheat records only** tag when that happens.
 Reverse controls is a handicap, so it still counts.
+
+Cheated runs still land on a second, **incl. cheats** record track (the best of *all*
+runs — a clean run that beats it updates it too, but a cheated run never touches the
+clean records). Tick **Show cheat records** in the Records menu or under the end-of-run
+card to see it: the extra rows/tiles appear next to the clean ones, and any value a
+cheated run set is shown in **red with ⚠** (new ones get a red **CHEAT RECORD** badge).
+Maps holding only cheated records are hidden while the box is unticked.
 
 ### Toolbar
 

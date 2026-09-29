@@ -44,6 +44,9 @@
   <div class="stage-frame" id="stage_frame">
     <canvas id="stage" width="1280" height="720" tabindex="0"></canvas>
     <div id="toast" role="status"></div>
+    <label id="endcard_cheats" class="endcard-toggle" style="display:none;"
+           title="Also show records set with cheats (⚠ red = a cheated run set it)">
+      <input type="checkbox"> Show cheat records</label>
   </div>
 
   <div class="toolbar">
@@ -153,7 +156,7 @@
     <button id="bp_openexit" title="Toggle the underworld's right wall (E)"><span class="btn-label">Open Exit</span> <kbd>E</kbd></button>
     <button id="bp_teleport" title="Teleport the car(s): X = score, Y = altitude">Teleport…</button>
   </div>
-  <p class="note">Any cheat (and slow-mo below 1×) pauses record-keeping for that run. Reverse controls still counts.</p>
+  <p class="note">Any cheat (and slow-mo below 1×) makes that run count toward cheat records only. Reverse controls still counts.</p>
 
   <h3>Messages</h3>
   <span id="bp_status"></span>
@@ -166,7 +169,7 @@
       <button id="tune_resetall" class="danger">Reset all</button>
     </div>
     <div id="tune_root"></div>
-    <p class="note">Changes affect every car, the AI included (it was trained on stock physics, so expect chaos). Any change keeps the run off the records. Double-click a knob's name to reset it.</p>
+    <p class="note">Changes affect every car, the AI included (it was trained on stock physics, so expect chaos). Any change makes the run count toward cheat records only. Double-click a knob's name to reset it.</p>
     <h3>Debugging only</h3>
     <div class="dbg">
       Spin-investigation presets:<br>
@@ -239,6 +242,8 @@
       <button data-sort="score" title="Highest best score (distance) first">Best score</button>
       <button data-sort="time" title="Fastest finish first; maps you haven't finished go last">Best time</button>
     </div>
+    <label class="rec-cheat-toggle" title="Also show records set with cheats (⚠ red = a cheated run set it)">
+      <input type="checkbox" id="records_show_cheats"> Show cheat records</label>
   </div>
   <div id="records_list" class="menu-list"></div>
   <div class="modal-footer"><button id="records_close">Close (Esc)</button></div>

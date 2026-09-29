@@ -178,7 +178,7 @@ function _bpFloatOneCar(c) {
   }
 }
 export function bpFloatCar() {
-  S.runTainted = true;   // one-shot cheat → this run is off the record
+  S.runTainted = true;   // one-shot cheat → cheat records only
   // Float every car on screen — AI and human alike (both players in Human-vs-Human).
   let n = 0;
   if (S.players) {
@@ -211,7 +211,7 @@ function _bpUnderworldOneCar(c) {
   }
 }
 export function bpUnderworld() {
-  S.runTainted = true;   // one-shot cheat → this run is off the record
+  S.runTainted = true;   // one-shot cheat → cheat records only
   // Send every car on screen down to the underworld — AI and human alike.
   let n = 0;
   if (S.players) {
@@ -238,7 +238,7 @@ function _bpStopOneCar(c) {
   }
 }
 export function bpStop() {
-  S.runTainted = true;   // one-shot cheat → this run is off the record
+  S.runTainted = true;   // one-shot cheat → cheat records only
   let n = 0;
   if (S.players) {
     for (let i = 0; i < S.players.length; i++) {
@@ -277,7 +277,7 @@ export function bpSyncExitButton(open) {
   if (el) el.textContent = open ? "Close Exit" : "Open Exit";
 }
 export function bpToggleExit() {
-  S.runTainted = true;   // one-shot cheat → this run is off the record
+  S.runTainted = true;   // one-shot cheat → cheat records only
   const g = S.ground;
   if (!g || !g.vectors || g.vectors.length < 3 || !g.dirtBody) { bpSetStatus("No terrain — start a run first."); return; }
   const V = g.vectors, n = V.length;

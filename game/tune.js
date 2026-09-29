@@ -284,7 +284,7 @@ export function setTune(vals) {
   if (pend.newmap) msgs.push("generate a New map (T) to see the terrain change");
   _reminded = msgs.length > 0;
   if (msgs.length) _status("To see it: " + msgs.join("; ") + ".");
-  else _status(tuneModified() ? "Physics playground: changes applied live (this run won't be recorded)."
+  else _status(tuneModified() ? "Physics playground: changes applied live (this run counts toward cheat records only)."
                               : "Physics back to stock.");
 }
 export function resetTune(secId) {

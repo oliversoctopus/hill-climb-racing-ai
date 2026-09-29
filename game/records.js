@@ -1,8 +1,11 @@
 // Personal records (human runs only), persisted in localStorage: best score and fastest
 // finish time, per map and across all maps. A map is identified by a hash of its
 // geometry, so the same terrain matches whether it was generated, re-loaded from the
-// session list, or loaded from Saved. Runs that used a cheat (or slow-mo) are "tainted"
-// and never recorded.
+// session list, or loaded from Saved. Runs that used a cheat (or slow-mo) are "tainted":
+// they never count toward the clean records, only toward a second "incl. cheats" track
+// (m.all) — the best of ALL runs, each value flagged with whether a cheated run set it.
+// A clean run that beats that track updates it too; a cheated run never touches the
+// clean one. The UI shows the second track behind a "Show cheat records" checkbox.
 //
 // Each map with a record gets a permanent sequential `id` (in the order maps first set a
 // record) and a stored copy of its terrain, so it can be re-loaded from the Records menu.
@@ -26,11 +29,14 @@ function _load() {
         d.nextId = id;
       }
       delete d.global;           // now derived (see _global)
+      for (const m of Object.values(d.maps)) if (!m.all) m.all = _cleanAll(m);   // pre-cheat-track blob
       return d;
     }
   } catch (e) { /* corrupt or storage blocked → start fresh */ }
   return { version: 1, nextId: 1, maps: {} };
 }
+// The incl.-cheats track, seeded from a map's clean bests.
+function _cleanAll(m) { return { score: m.bestScore, scoreCheated: false, time: m.bestTime, timeCheated: false }; }
 function _save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
 
 // Best score / fastest finish over all maps, with the key of the map holding each.
@@ -41,6 +47,30 @@ function _global(d) {
     if (m.bestTime != null && (g.bestTime == null || m.bestTime < g.bestTime)) { g.bestTime = m.bestTime; g.bestTimeKey = k; }
   }
   return g;
+}
+// Same over the incl.-cheats track (+ whether each winning value was a cheated run).
+function _globalAll(d) {
+  const g = { score: 0, scoreKey: "", scoreCheated: false, time: null, timeKey: "", timeCheated: false };
+  for (const [k, m] of Object.entries(d.maps)) {
+    const a = m.all;
+    if (a.score > g.score) { g.score = a.score; g.scoreKey = k; g.scoreCheated = a.scoreCheated; }
+    if (a.time != null && (g.time == null || a.time < g.time)) { g.time = a.time; g.timeKey = k; g.timeCheated = a.timeCheated; }
+  }
+  return g;
+}
+
+// ---- "Show cheat records" setting (shared by the Records menu and the end card) ----
+const SHOW_KEY = "hcr_show_cheat_records";
+let _show = null;
+export function showCheatRecords() {
+  if (_show === null) { try { _show = localStorage.getItem(SHOW_KEY) === "1"; } catch (e) { _show = false; } }
+  return _show;
+}
+export function setShowCheatRecords(on) {
+  _show = !!on;
+  try { localStorage.setItem(SHOW_KEY, _show ? "1" : "0"); } catch (e) {}
+  refreshRecordsStrip();   // labels of cheat-only maps appear/disappear
+  document.dispatchEvent(new Event("hcr-cheat-records-toggled"));
 }
 
 // ---- Map identity ------------------------------------------------------------
@@ -96,6 +126,7 @@ function _storeCurrentMap(key) {
     ys: _f64ToB64(g.vectors.map(v => v.y)),
     grass: g.grassPositions.map(x => (x < 0 ? "." : String(x))).join(""),   // sprite idx 0-4, "." = none
     spawning_y: getSpawningY(),
+    tuned: !!g.tuned,   // a physics-playground map: runs on it stay "cheated" when re-loaded
   };
   return _saveMaps(all);   // false = storage full; the record still counts, just can't be re-loaded
 }
@@ -108,7 +139,7 @@ export function recordMapSource(key) {
     const xs = t.xs ? _b64ToF64(t.xs) : _regularXs(t, t.n);
     const grass = Array.from(t.grass, c => (c === "." ? -1 : Number(c)));
     return { vectors: xs.map((x, i) => new Vec2(x, ys[i])), grassPositions: grass,
-             spawning_y: t.spawning_y };
+             spawning_y: t.spawning_y, tuned: !!t.tuned };
   } catch (e) { return null; }
 }
 export function deleteRecordMap(key) {
@@ -132,17 +163,22 @@ function _savedNames() {
 function _label(d, key, saved) {
   const m = key && d.maps[key];
   if (!m) return "";
+  // A map holding only cheated records stays anonymous while those are hidden.
+  if (!(m.bestScore > 0 || m.bestTime != null) && !showCheatRecords()) return "";
   return saved[key] || `Record map ${m.id}`;
 }
 export function recordMapLabel(key) { return _label(_load(), key, _savedNames()); }
 
-// Every record map for the Records menu, oldest id first.
+// Every record map for the Records menu, oldest id first. `clean` = has a clean record
+// (a map can hold only cheated ones); `all` = its incl.-cheats track.
 export function listRecordMaps() {
-  const d = _load(), saved = _savedNames(), stored = _loadMaps(), g = _global(d);
+  const d = _load(), saved = _savedNames(), stored = _loadMaps(), g = _global(d), ga = _globalAll(d);
   return Object.entries(d.maps)
     .map(([key, m]) => ({ key, id: m.id, label: _label(d, key, saved), bestScore: m.bestScore,
                           bestTime: m.bestTime, loadable: !!stored[key],
-                          globalScore: key === g.bestScoreKey, globalTime: key === g.bestTimeKey }))
+                          clean: m.bestScore > 0 || m.bestTime != null, all: m.all,
+                          globalScore: key === g.bestScoreKey, globalTime: key === g.bestTimeKey,
+                          globalAllScore: key === ga.scoreKey, globalAllTime: key === ga.timeKey }))
     .sort((a, b) => a.id - b.id);
 }
 
@@ -151,6 +187,11 @@ export function mapRecord(key) {
   return { bestScore: m ? m.bestScore : 0, bestTime: m ? m.bestTime : null };
 }
 export function globalRecord() { return _global(_load()); }
+export function mapRecordAll(key) {
+  const m = _load().maps[key];
+  return m ? m.all : { score: 0, scoreCheated: false, time: null, timeCheated: false };
+}
+export function globalRecordAll() { return _globalAll(_load()); }
 
 // ---- Runs ----------------------------------------------------------------------
 // Seconds a player has been driving: frozen at the finish, or at death.
@@ -172,27 +213,36 @@ export function cheatsActive() {
 
 // Fold a human player's run into the stored records. Idempotent (max/min), so it's safe
 // to call on finish, on death, and again when the run is abandoned. New-record flags
-// are OR-ed onto p.newRec for the end card. A map only gets an entry (id + stored
-// terrain) once a run actually sets something on it.
+// are OR-ed onto p.newRec for the end card (clean: mapScore/globalScore/...; incl.-cheats
+// track: allMapScore/allGlobalScore/...). A map only gets an entry (id + stored terrain)
+// once a run actually sets something on it.
 export function commitRun(p, score) {
-  if (!p || p.isAI || S.runTainted || !S.mapKey) return;
+  if (!p || p.isAI || !S.mapKey) return;
+  const cheated = S.runTainted;
   const time = p.beatTick ? p.beatTick / FRAME_RATE : null;
   const d = _load();
-  const g = _global(d);
-  const prev = d.maps[S.mapKey] || { bestScore: 0, bestTime: null };
-  const betterScore = score > prev.bestScore;
-  const betterTime = time != null && (prev.bestTime == null || time < prev.bestTime);
-  if (!betterScore && !betterTime) return;
+  const g = _global(d), ga = _globalAll(d);
+  const prev = d.maps[S.mapKey] || { bestScore: 0, bestTime: null, all: _cleanAll({ bestScore: 0, bestTime: null }) };
+  const betterScore = !cheated && score > prev.bestScore;
+  const betterTime = !cheated && time != null && (prev.bestTime == null || time < prev.bestTime);
+  const allScore = score > prev.all.score;
+  const allTime = time != null && (prev.all.time == null || time < prev.all.time);
+  if (!betterScore && !betterTime && !allScore && !allTime) return;
   if (!d.maps[S.mapKey]) {
-    d.maps[S.mapKey] = { id: d.nextId++, bestScore: 0, bestTime: null };
+    d.maps[S.mapKey] = { id: d.nextId++, bestScore: 0, bestTime: null, all: prev.all };
     _storeCurrentMap(S.mapKey);
   }
   const m = d.maps[S.mapKey];
   const nr = p.newRec || (p.newRec = {});
+  nr.cheated = cheated;
   if (betterScore) { m.bestScore = score; nr.mapScore = true; }
   if (betterTime) { m.bestTime = time; nr.mapTime = true; }
-  if (score > g.bestScore) nr.globalScore = true;
-  if (time != null && (g.bestTime == null || time < g.bestTime)) nr.globalTime = true;
+  if (betterScore && score > g.bestScore) nr.globalScore = true;
+  if (betterTime && (g.bestTime == null || time < g.bestTime)) nr.globalTime = true;
+  if (allScore) { m.all.score = score; m.all.scoreCheated = cheated; nr.allMapScore = true; }
+  if (allTime) { m.all.time = time; m.all.timeCheated = cheated; nr.allMapTime = true; }
+  if (allScore && score > ga.score) nr.allGlobalScore = true;
+  if (allTime && (ga.time == null || time < ga.time)) nr.allGlobalTime = true;
   _save(d);
   refreshRecordsStrip();
 }

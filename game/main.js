@@ -14,7 +14,7 @@ import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerr
          findSavedByName, findSavedByGeometry } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
 import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, deleteRecordMap,
-         fmtTime } from "./records.js";
+         fmtTime, showCheatRecords, setShowCheatRecords } from "./records.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
@@ -226,13 +226,16 @@ function closeTerrainMenus() {
 }
 // Records menu: all-maps bests on top, then every map holding a record (sortable), with
 // Load (exact stored terrain) and Delete.
+// With "Show cheat records" on, sort by the incl.-cheats track.
+const _sv = r => (showCheatRecords() ? r.all.score : r.bestScore);
+const _tv = r => (showCheatRecords() ? r.all.time : r.bestTime);
 const REC_SORTS = {
   id:    (a, b) => a.id - b.id,
-  score: (a, b) => (b.bestScore - a.bestScore) || (a.id - b.id),
+  score: (a, b) => (_sv(b) - _sv(a)) || (a.id - b.id),
   // fastest finish first; unfinished maps last, among themselves by best score
-  time:  (a, b) => ((a.bestTime == null) - (b.bestTime == null)) ||
-                   (a.bestTime != null ? a.bestTime - b.bestTime : 0) ||
-                   (b.bestScore - a.bestScore) || (a.id - b.id),
+  time:  (a, b) => ((_tv(a) == null) - (_tv(b) == null)) ||
+                   (_tv(a) != null ? _tv(a) - _tv(b) : 0) ||
+                   (_sv(b) - _sv(a)) || (a.id - b.id),
 };
 let _recSort = "id";
 try { const v = localStorage.getItem("hcr_records_sort"); if (REC_SORTS[v]) _recSort = v; } catch (e) {}
@@ -248,7 +251,10 @@ function renderRecordsMenu() {
   const list = document.getElementById("records_list");
   const summary = document.getElementById("records_summary");
   for (const b of document.querySelectorAll("#records_sort button")) b.classList.toggle("active", b.dataset.sort === _recSort);
-  const maps = listRecordMaps();
+  const show = showCheatRecords();
+  document.getElementById("records_show_cheats").checked = show;
+  const all = listRecordMaps();
+  const maps = show ? all : all.filter(r => r.clean);   // a map can hold only cheated records
   list.innerHTML = ""; summary.innerHTML = "";
   if (!maps.length) {
     list.innerHTML = '<div class="menu-empty">No records yet. Drive a map (no cheats) and your best score and fastest finish land here.</div>';
@@ -258,6 +264,17 @@ function renderRecordsMenu() {
   summary.append(
     _recTile(topScore ? topScore.bestScore : "—", `best score · any map${topScore ? ` (${topScore.label})` : ""}`),
     _recTile(topTime ? fmtTime(topTime.bestTime) : "—", `best time · any map${topTime ? ` (${topTime.label})` : " — no finishes yet"}`, true));
+  if (show) {
+    // The incl.-cheats bests; red + ⚠ when a cheated run holds them.
+    const aS = maps.find(r => r.globalAllScore), aT = maps.find(r => r.globalAllTime);
+    const tS = _recTile(aS ? (aS.all.scoreCheated ? "⚠" : "") + aS.all.score : "—",
+                        `best score · incl. cheats${aS ? ` (${aS.label})` : ""}`);
+    const tT = _recTile(aT ? (aT.all.timeCheated ? "⚠" : "") + fmtTime(aT.all.time) : "—",
+                        `best time · incl. cheats${aT ? ` (${aT.label})` : " — no finishes yet"}`, true);
+    tS.classList.toggle("cheat", !!(aS && aS.all.scoreCheated));
+    tT.classList.toggle("cheat", !!(aT && aT.all.timeCheated));
+    summary.append(tS, tT);
+  }
 
   const head = document.createElement("div");
   head.className = "terrain-row rec-row rec-head";
@@ -292,6 +309,18 @@ function renderRecordsMenu() {
                     r.globalScore ? "best score on any map" : "best score on this map");
     const tm = stat("rec-stat time", fmtTime(r.bestTime), r.globalTime,
                     r.globalTime ? "fastest finish on any map" : (r.bestTime == null ? "not finished yet" : "fastest finish on this map"));
+    if (show) {
+      // A cheated run holds this map's incl.-cheats best: show it under the clean one.
+      const cheatLine = (cell, text, top, tip) => {
+        const c = document.createElement("span");
+        c.className = "rec-cheat"; c.textContent = `⚠ ${text}${top ? " 🏆" : ""}`; c.title = tip;
+        cell.appendChild(c);
+      };
+      if (r.all.scoreCheated) cheatLine(sc, String(r.all.score), r.globalAllScore,
+        `best score incl. cheats${r.globalAllScore ? " on any map" : ""} — set by a cheated run`);
+      if (r.all.timeCheated) cheatLine(tm, fmtTime(r.all.time), r.globalAllTime,
+        `fastest finish incl. cheats${r.globalAllTime ? " on any map" : ""} — set by a cheated run`);
+    }
     const acts = document.createElement("span");
     acts.className = "rec-actions";
     const load = document.createElement("button");
@@ -318,6 +347,12 @@ function openRecordsMenu() {
   document.getElementById("records_panel").style.display = "block";
 }
 document.addEventListener("hcr-records-changed", updateCurrentTerrainBox);
+// "Show cheat records": one setting, two checkboxes (Records menu + end card).
+document.getElementById("records_show_cheats").onchange = (e) => setShowCheatRecords(e.target.checked);
+document.querySelector("#endcard_cheats input").onchange = (e) => { setShowCheatRecords(e.target.checked); focusGame(); };
+document.addEventListener("hcr-cheat-records-toggled", () => {
+  if (document.getElementById("records_panel").style.display === "block") renderRecordsMenu();
+});
 document.getElementById("records_btn").onclick = openRecordsMenu;
 document.getElementById("records_title_btn").onclick = openRecordsMenu;
 document.getElementById("records_close").onclick = () => { document.getElementById("records_panel").style.display = "none"; focusGame(); };

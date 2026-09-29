@@ -14,7 +14,7 @@ import { T, tuneTick, tuneGroundPre, tuneGroundPost, terrainTuned, syncGroundDim
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
 import { recordTick, applyFlyCheats, bpSetZeroG,
          bpSyncExitButton } from "./cheats.js";
-import { mapKeyOf, mapRecord, globalRecord, commitRun, cheatsActive, refreshRecordsStrip,
+import { mapKeyOf, mapRecord, mapRecordAll, globalRecord, commitRun, cheatsActive, refreshRecordsStrip,
          recordMapLabel } from "./records.js";
 
 // ---- Score metric --------------------------------------------------------
@@ -262,7 +262,7 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
   // Records: identify the map and snapshot the bests to beat for this run.
   S.mapKey = mapKeyOf(S.ground);
   S.runTainted = false;
-  S.recStart = { map: mapRecord(S.mapKey), global: { ...globalRecord() } };
+  S.recStart = { map: mapRecord(S.mapKey), global: { ...globalRecord() }, all: { ...mapRecordAll(S.mapKey) } };
   refreshRecordsStrip();
 
   S.players = spawnPlayers(spawnDx, spawnDy);
