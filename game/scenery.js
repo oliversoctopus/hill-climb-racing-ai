@@ -126,9 +126,19 @@ export function drawBackground(ctx, viewWidth) {
 }
 
 // Integer hash of a pebble cell → 4 values in [0,1). Pebbles are placed per world
-// cell (not baked into the repeating dirt tile) so they never visibly repeat.
-function _cellRand(cx, cy) {
-  let h = Math.imul(cx, 0x27d4eb2d) ^ Math.imul(cy, 0x165667b1);
+// cell (not baked into the repeating dirt tile) so they never visibly repeat. Seeded
+// by the map key: each map gets its own pebbles, the same every time it's loaded.
+let _seedKey = null, _seed = 0;
+function _mapSeed() {
+  if (S.mapKey !== _seedKey) {
+    _seedKey = S.mapKey;
+    _seed = 0x9e3779b9;
+    for (let i = 0; i < _seedKey.length; i++) _seed = Math.imul(_seed ^ _seedKey.charCodeAt(i), 0x01000193);
+  }
+  return _seed;
+}
+function _cellRand(cx, cy, seed) {
+  let h = Math.imul(cx, 0x27d4eb2d) ^ Math.imul(cy, 0x165667b1) ^ seed;
   const out = [];
   for (let i = 0; i < 4; i++) {
     h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h ^= h + Math.imul(h ^ (h >>> 7), 0x297a2d39);
@@ -144,8 +154,9 @@ function _drawPebbles(ctx, viewWidth) {
   const y0 = Math.floor((S.cameraPanY - PAD - 12) / PEBBLE_CELL);
   const y1 = Math.floor((S.cameraPanY + CANVAS_HEIGHT + 60 + 12) / PEBBLE_CELL);
   const peb = [];
+  const seed = _mapSeed();
   for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
-    const [a, b, c, d] = _cellRand(cx, cy);
+    const [a, b, c, d] = _cellRand(cx, cy, seed);
     if (d < 0.3) continue;
     const rx = 3 + c * 8, ry = rx * (0.55 + d * 0.3);
     peb.push([(cx + a) * PEBBLE_CELL - S.cameraPanX, (cy + b) * PEBBLE_CELL - S.cameraPanY, rx, ry]);
