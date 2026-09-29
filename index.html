@@ -233,6 +233,15 @@
   <div class="modal-title">🏆 Record maps</div>
   <div class="modal-note">Every map you've set a record on, in the order you first set one.
     Saved maps show their Saved name. <b>Load</b> a map to try to beat your record on it.</div>
+  <div id="records_summary" class="rec-summary"></div>
+  <div class="rec-sortbar">
+    <span class="label">Sort by</span>
+    <div class="seg" id="records_sort">
+      <button data-sort="id" title="The order you first set a record on each map">Order set</button>
+      <button data-sort="score" title="Highest best score (distance) first">Best score</button>
+      <button data-sort="time" title="Fastest finish first; maps you haven't finished go last">Best time</button>
+    </div>
+  </div>
   <div id="records_list" class="menu-list"></div>
   <div class="modal-footer"><button id="records_close">Close (Esc)</button></div>
 </div>

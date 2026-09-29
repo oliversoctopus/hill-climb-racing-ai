@@ -223,16 +223,54 @@ function closeTerrainMenus() {
   document.getElementById("saved_panel").style.display = "none";
   document.getElementById("records_panel").style.display = "none";
 }
-// Records menu: every map holding a record, with Load (exact stored terrain) and Delete.
+// Records menu: all-maps bests on top, then every map holding a record (sortable), with
+// Load (exact stored terrain) and Delete.
+const REC_SORTS = {
+  id:    (a, b) => a.id - b.id,
+  score: (a, b) => (b.bestScore - a.bestScore) || (a.id - b.id),
+  // fastest finish first; unfinished maps last, among themselves by best score
+  time:  (a, b) => ((a.bestTime == null) - (b.bestTime == null)) ||
+                   (a.bestTime != null ? a.bestTime - b.bestTime : 0) ||
+                   (b.bestScore - a.bestScore) || (a.id - b.id),
+};
+let _recSort = "id";
+try { const v = localStorage.getItem("hcr_records_sort"); if (REC_SORTS[v]) _recSort = v; } catch (e) {}
+function _recTile(val, sub, isTime) {
+  const t = document.createElement("div");
+  t.className = "rec" + (isTime ? " time" : "");
+  const v = document.createElement("div"); v.className = "rec-val"; v.textContent = val;
+  const s2 = document.createElement("div"); s2.className = "rec-sub"; s2.textContent = sub; s2.title = sub;
+  t.append(v, s2);
+  return t;
+}
 function renderRecordsMenu() {
   const list = document.getElementById("records_list");
+  const summary = document.getElementById("records_summary");
+  for (const b of document.querySelectorAll("#records_sort button")) b.classList.toggle("active", b.dataset.sort === _recSort);
   const maps = listRecordMaps();
-  list.innerHTML = "";
+  list.innerHTML = ""; summary.innerHTML = "";
   if (!maps.length) {
     list.innerHTML = '<div class="menu-empty">No records yet. Drive a map (no cheats) and your best score and fastest finish land here.</div>';
     return;
   }
-  for (const r of maps) {
+  const topScore = maps.find(r => r.globalScore), topTime = maps.find(r => r.globalTime);
+  summary.append(
+    _recTile(topScore ? topScore.bestScore : "—", `best score · any map${topScore ? ` (${topScore.label})` : ""}`),
+    _recTile(topTime ? fmtTime(topTime.bestTime) : "—", `best time · any map${topTime ? ` (${topTime.label})` : " — no finishes yet"}`, true));
+
+  const head = document.createElement("div");
+  head.className = "terrain-row rec-row rec-head";
+  const cols = [["#", "id"], ["Map", null], ["Best score", "score"], ["Best time", "time"], ["", null]];
+  for (const [txt, key] of cols) {
+    const c = document.createElement("span");
+    const arrow = key === _recSort ? (key === "score" ? " ▼" : key === "time" ? " ▲" : "") : "";
+    c.textContent = txt + arrow;
+    if (key && key === _recSort) c.className = "sorted";
+    head.appendChild(c);
+  }
+  list.appendChild(head);
+
+  for (const r of maps.slice().sort(REC_SORTS[_recSort])) {
     const row = document.createElement("div");
     row.className = "terrain-row rec-row";
     const id = document.createElement("span");
@@ -240,14 +278,21 @@ function renderRecordsMenu() {
     const nm = document.createElement("span");
     nm.className = "terrain-name";
     nm.textContent = r.label + (r.key === S.mapKey ? "  (current)" : "");
-    const tr = document.createElement("span");
-    tr.className = "trophy";
-    tr.textContent = (r.globalScore || r.globalTime) ? "🏆" : "";
-    tr.title = [r.globalScore && "best score on any map", r.globalTime && "fastest finish on any map"].filter(Boolean).join(" · ");
-    const sc = document.createElement("span");
-    sc.className = "rec-stat"; sc.textContent = r.bestScore || "—"; sc.title = "best score";
-    const tm = document.createElement("span");
-    tm.className = "rec-stat time"; tm.textContent = fmtTime(r.bestTime); tm.title = "fastest finish";
+    nm.title = nm.textContent;
+    const stat = (cls, text, top, tip) => {
+      const e = document.createElement("span");
+      e.className = cls;
+      if (top) { const t = document.createElement("span"); t.className = "trophy"; t.textContent = "🏆"; e.appendChild(t); }
+      e.appendChild(document.createTextNode(text));
+      e.title = tip;
+      return e;
+    };
+    const sc = stat("rec-stat", String(r.bestScore || "—"), r.globalScore,
+                    r.globalScore ? "best score on any map" : "best score on this map");
+    const tm = stat("rec-stat time", fmtTime(r.bestTime), r.globalTime,
+                    r.globalTime ? "fastest finish on any map" : (r.bestTime == null ? "not finished yet" : "fastest finish on this map"));
+    const acts = document.createElement("span");
+    acts.className = "rec-actions";
     const load = document.createElement("button");
     load.textContent = "Load";
     load.dataset.recLoad = r.key;
@@ -255,14 +300,23 @@ function renderRecordsMenu() {
     const del = document.createElement("button");
     del.textContent = "Delete"; del.className = "danger";
     del.dataset.recDel = r.key;
-    row.append(id, nm, tr, sc, tm, load, del);
+    acts.append(load, del);
+    row.append(id, nm, sc, tm, acts);
     list.appendChild(row);
   }
 }
+document.getElementById("records_sort").onclick = (e) => {
+  const k = e.target && e.target.dataset && e.target.dataset.sort;
+  if (!k || !REC_SORTS[k]) return;
+  _recSort = k;
+  try { localStorage.setItem("hcr_records_sort", k); } catch (err) {}
+  renderRecordsMenu();
+};
 function openRecordsMenu() {
   renderRecordsMenu();
   document.getElementById("records_panel").style.display = "block";
 }
+document.addEventListener("hcr-records-changed", updateCurrentTerrainBox);
 document.getElementById("records_btn").onclick = openRecordsMenu;
 document.getElementById("records_title_btn").onclick = openRecordsMenu;
 document.getElementById("records_close").onclick = () => { document.getElementById("records_panel").style.display = "none"; focusGame(); };

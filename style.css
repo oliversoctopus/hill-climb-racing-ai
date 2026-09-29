@@ -109,7 +109,7 @@ input[type=number] { width: 90px; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
   background: var(--bg-2); border: 1px solid var(--line); color: #9fd4ff; font-weight: 700; font-size: 13px;
-  max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .chip .lbl { color: var(--muted); }
 .label { color: var(--muted); font-weight: 700; font-size: 13px; }
@@ -231,11 +231,24 @@ details.pop[open] > .pop-body {
 .terrain-row:nth-child(odd) { background: var(--bg-2); }
 .terrain-row .terrain-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .terrain-row button { padding: 5px 12px; font-size: 13px; }
-.rec-row .rec-id { color: var(--muted); font-weight: 800; font-size: 12px; min-width: 30px; }
-.rec-row .rec-stat { font-family: var(--display); font-size: 16px; min-width: 64px; text-align: right; }
-.rec-row .rec-stat.time { color: #ffe9a8; min-width: 70px; }
-.rec-row .trophy { color: var(--accent); font-size: 12px; }
-#records_panel { max-width: min(92vw, 720px); }
+#records_panel { width: min(92vw, 720px); max-width: none; }
+.rec-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.rec-summary .rec { background: var(--bg-2); }
+.rec-sortbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.seg { display: flex; gap: 3px; background: var(--bg-2); padding: 3px; border-radius: 999px; border: 1px solid var(--line); }
+.seg button { background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.seg button:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.seg button.active { background: linear-gradient(180deg, var(--accent), var(--accent-2)); color: #2a1600; }
+.terrain-row.rec-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 96px 104px 138px; gap: 8px; }
+.rec-row .rec-id { color: var(--muted); font-weight: 800; font-size: 12px; }
+.rec-row .rec-stat { font-family: var(--display); font-size: 16px; text-align: right; white-space: nowrap; }
+.rec-row .rec-stat.time { color: #ffe9a8; }
+.rec-row .rec-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.rec-row .trophy { font-size: 12px; margin-right: 4px; }
+.terrain-row.rec-head { background: none !important; color: var(--muted); font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.8px; padding-top: 0; padding-bottom: 2px; }
+.rec-head span:nth-child(3), .rec-head span:nth-child(4) { text-align: right; }
+.rec-head .sorted { color: var(--accent); }
 .menu-empty { color: var(--muted); padding: 14px 8px; text-align: center; line-height: 1.5; }
 .keys { border-collapse: collapse; width: 100%; }
 .keys td { padding: 5px 8px; vertical-align: top; line-height: 1.5; }

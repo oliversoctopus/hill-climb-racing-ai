@@ -217,4 +217,7 @@ export function refreshRecordsStrip() {
   const sl = _label(d, g.bestScoreKey, saved), tl = _label(d, g.bestTimeKey, saved);
   set("rec_all_score", g.bestScore || "—", `best score · all maps${sl ? ` (${sl})` : ""}`);
   set("rec_all_time",  fmtTime(g.bestTime), `fastest finish · all maps${tl ? ` (${tl})` : ""}`);
+  // Labels may have changed (new record map, save/rename/delete) — main.js refreshes the
+  // Map chip on this (an event, since sim.js already imports this module).
+  document.dispatchEvent(new Event("hcr-records-changed"));
 }

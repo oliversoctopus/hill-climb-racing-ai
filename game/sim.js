@@ -12,7 +12,8 @@ import { isBelowKillLine } from "./geom.js";
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
 import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG,
          bpSyncExitButton } from "./cheats.js";
-import { mapKeyOf, mapRecord, globalRecord, commitRun, cheatsActive, refreshRecordsStrip } from "./records.js";
+import { mapKeyOf, mapRecord, globalRecord, commitRun, cheatsActive, refreshRecordsStrip,
+         recordMapLabel } from "./records.js";
 
 // ---- Score metric --------------------------------------------------------
 // Project score: (max forward px − spawn) / 10, floored, >= 0. Matches eval.py
@@ -372,7 +373,12 @@ export function updateCurrentTerrainBox() {
   // "(unsaved)" flags a map whose saved copy was deleted — it's still loaded, just no
   // longer stored. Only shown when there's actually a name to qualify.
   const suffix = (S.currentTerrainUnsaved && S.currentTerrainName) ? " (unsaved)" : "";
-  box.textContent = `${S.currentTerrainName || "—"}${suffix}`;
+  // A map holding a record also shows its record label ("Terrain 7 · Record map 5"),
+  // unless that's already its name (loaded from Records or Saved).
+  const rec = S.mapKey ? recordMapLabel(S.mapKey) : "";
+  const recSfx = (rec && rec !== S.currentTerrainName) ? ` · ${rec}` : "";
+  box.textContent = `${S.currentTerrainName || "—"}${suffix}${recSfx}`;
+  box.parentElement.title = box.textContent;
 }
 
 // ---- Actions + the per-tick step ----------------------------------------

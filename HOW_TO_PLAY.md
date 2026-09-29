@@ -74,8 +74,12 @@ and deletes), otherwise as **Record map N** — so the numbers skip past saved m
 ("Record map 1", "Hilly", "Record map 3").
 
 Every record map's terrain is stored too, so you can go back and beat it: **🏆 Records**
-in the toolbar (or click **Your records**) lists them all — number, name, best score,
-fastest finish, a 🏆 on the ones holding the all-maps bests — with **Load** (rebuilds
+in the toolbar (or click **Your records**) shows your all-maps **best score** and **best
+time** on top, then lists every record map — number, name, best score, best time
+(fastest finish), a 🏆 next to the all-maps bests. **Sort by** switches between
+**Order set** (the numbering), **Best score** (farthest first) and **Best time**
+(fastest first; maps you haven't finished go last); it remembers your choice. Each
+row has **Load** (rebuilds
 the exact same map, grass and all) and **Delete** (drops that map's records; asks
 first). Each stored map takes ~16 KB of browser storage. Only human runs
 count, and a run doesn't count if you used a cheat (Invincible, Zero-G, Flight,
