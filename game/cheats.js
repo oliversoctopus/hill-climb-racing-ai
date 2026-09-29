@@ -324,7 +324,7 @@ function _edgeMatches(fix, ax, ay, bx, by, eps) {
 // Keep the button's label honest: "Open Exit" while the wall is up, "Close Exit" once
 // it's down. Rebuilds restore the wall, so buildWithGround calls this with open=false.
 export function bpSyncExitButton(open) {
-  const el = document.getElementById("bp_openexit");
+  const el = document.querySelector("#bp_openexit .btn-label");   // keeps the <kbd>E</kbd> marker
   if (el) el.textContent = open ? "Close Exit" : "Open Exit";
 }
 export function bpToggleExit() {

@@ -41,7 +41,7 @@
 </header>
 
 <main class="main">
-  <div class="stage-frame">
+  <div class="stage-frame" id="stage_frame">
     <canvas id="stage" width="1280" height="720" tabindex="0"></canvas>
     <div id="toast" role="status"></div>
   </div>
@@ -51,6 +51,7 @@
       <button id="reset_pos" title="Put the car(s) back at the start of this same map (R)">↺ Restart <kbd>R</kbd></button>
       <button id="reset" title="Generate a brand-new random map (T)">🎲 New map <kbd>T</kbd></button>
       <button id="pause" title="Pause / Resume (P)">Pause</button>
+      <button id="fullscreen_btn" title="Fullscreen the game screen (Esc to exit)">⛶ Fullscreen</button>
     </div>
     <div class="sep"></div>
     <label class="group label" title="Simulation speed (Shift+Scroll also steps this). Slow-mo runs aren't recorded.">Speed
@@ -147,7 +148,7 @@
     <button id="bp_float" title="Lift every car ~300px, keeping velocity (F)">Float <kbd>F</kbd></button>
     <button id="bp_stop" title="Zero all velocity on every car (X)">Stop <kbd>X</kbd></button>
     <button id="bp_underworld" title="Drop every car to 1.5 m above the fall-off line (U)">Underworld <kbd>U</kbd></button>
-    <button id="bp_openexit" title="Toggle the underworld's right wall (E)">Open Exit</button>
+    <button id="bp_openexit" title="Toggle the underworld's right wall (E)"><span class="btn-label">Open Exit</span> <kbd>E</kbd></button>
     <button id="bp_teleport" title="Teleport the car(s): X = score, Y = altitude">Teleport…</button>
   </div>
   <p class="note">Any cheat (and slow-mo below 1×) pauses record-keeping for that run. Reverse controls still counts.</p>

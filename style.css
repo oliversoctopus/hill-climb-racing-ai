@@ -80,6 +80,11 @@ input[type=number] { width: 90px; }
 /* ---- Stage ---- */
 .main { margin: 0 auto; padding: 16px 16px 40px; }
 .stage-frame { position: relative; width: fit-content; max-width: 100%; margin: 0 auto; }
+.stage-frame:fullscreen {
+  width: 100vw; height: 100vh; max-width: none; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+.stage-frame:fullscreen #stage { border-radius: 0; box-shadow: none; }
 #stage {
   display: block; border-radius: 16px; background: #87ceeb;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);

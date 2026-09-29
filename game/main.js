@@ -18,7 +18,7 @@ import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, d
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
-  bpTeleport, bpTeleportCurrent, bpFlag, bpDownload, bpApplyPhys, _bpNum,
+  bpTeleport, bpTeleportCurrent, bpFlag, bpDownload, bpApplyPhys, _bpNum, showToast,
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 
@@ -65,8 +65,9 @@ function _setupHiDPI() {
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
   const w = stageWidth(), h = CANVAS_HEIGHT;
-  const availW = document.documentElement.clientWidth - 32;
-  const availH = Math.max(360, window.innerHeight - 190);
+  const fs = !!document.fullscreenElement;   // fullscreen: the stage gets the whole screen
+  const availW = fs ? window.innerWidth : document.documentElement.clientWidth - 32;
+  const availH = fs ? window.innerHeight : Math.max(360, window.innerHeight - 190);
   const cssW = Math.floor(Math.min(availW, availH * w / h));
   const cssH = Math.round(cssW * h / w);
   canvas.width  = Math.round(cssW * dpr);
@@ -76,7 +77,7 @@ function _setupHiDPI() {
   const k = canvas.width / w;
   ctx.setTransform(k, 0, 0, k, 0, 0);
   ctx.imageSmoothingQuality = "high";
-  document.documentElement.style.setProperty("--stage-w", `${Math.max(cssW, 960)}px`);
+  if (!fs) document.documentElement.style.setProperty("--stage-w", `${Math.max(cssW, 960)}px`);
 }
 window.addEventListener("resize", () => _setupHiDPI());
 // Exported so the backtrack search can shrink the 2×-wide split canvas back to 1×.
@@ -404,6 +405,19 @@ document.getElementById("save_current_btn").onclick = () => {
   renderSavedTerrainsMenu();
   setStatus(`Saved terrain “${name}”.`);
 };
+// Fullscreen the game screen (canvas + toast). _setupHiDPI re-fits it on the change.
+document.getElementById("fullscreen_btn").onclick = () => {
+  if (document.fullscreenElement) { document.exitFullscreen(); return; }
+  const frame = document.getElementById("stage_frame");
+  if (frame.requestFullscreen) frame.requestFullscreen().catch(() => setStatus("Fullscreen isn't available here."));
+};
+document.addEventListener("fullscreenchange", () => {
+  const fs = !!document.fullscreenElement;
+  document.getElementById("fullscreen_btn").textContent = fs ? "⛶ Exit fullscreen" : "⛶ Fullscreen";
+  _setupHiDPI();
+  if (fs) showToast("Fullscreen — press Esc to exit");
+  focusGame();
+});
 document.getElementById("pause").onclick = function() {
   S.paused = !S.paused;
   if (!S.paused) S.lastWallMs = 0;   // avoid huge dt burst on resume

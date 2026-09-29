@@ -90,6 +90,8 @@ Reverse controls is a handicap, so it still counts.
 - **🎲 New map** — throws away the current map and generates a
   brand-new random one, respawning everyone.
 - **Pause / Resume** — freezes the sim.
+- **⛶ Fullscreen** — fills the screen with just the game (HUD included); **Esc**
+  exits. Keys work as usual; switch modes with **Alt+1…5**.
 - **Speed (0.25x–8x)** — simulation speed multiplier (handy for watching the AI;
   for racing, stay on 1x). **Shift+Scroll** anywhere on the page steps it too
   (scroll up = faster). Every speed renders at your display's full frame rate —
