@@ -100,8 +100,10 @@ records, so one run can hold both. For a finished run the score splits into **to
 finish** (what the time measures), **fly-off** (until 5 s after the car leaves the end of
 the terrain — a real launch off the lip is over by then) and **after fly-off** (only reachable with
 cheats like Rocket/Flight). Click **▸** next to a record score in the Records menu to see
-the split; a **↗** marks scores with distance after the fly-off, and the end card shows
-the split automatically for such runs.
+the split (with how long the fly-off lasted); a **↗** marks scores with distance after the
+fly-off, and the end card shows the split automatically for such runs. A clean run with a
+fly-off of **90+ points** (≈ a score of 1973 on a normal map) earns a gold **✦ legendary
+fly-off** marker on the end card and next to the record.
 
 ### Toolbar
 

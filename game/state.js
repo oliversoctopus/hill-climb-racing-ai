@@ -29,6 +29,9 @@ export const STUCK_TIMEOUT_TICKS = 500;
 // 400 maps (highest lip, motor top speed launched up the steepest final ramp) 4.7 s.
 export const FLYOFF_GRACE_SEC = 5;
 export const FLYOFF_GRACE_TICKS = FLYOFF_GRACE_SEC * FRAME_RATE;
+// Gold "legendary fly-off" marker (clean runs only): fly-off distance, in score points.
+// 90 ≈ a score of ~1973 on a normal map — the best human launch in ~500 focused tries.
+export const LEGENDARY_FLYOFF = 90;
 
 // --- Player colors ---
 export const AI_COLOR    = { outline: "#5cf", torso: "#3c5ac8", shirtR: 80,  shirtG: 120, shirtB: 200 };

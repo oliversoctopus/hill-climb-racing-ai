@@ -4,7 +4,7 @@
 import {
   S, CANVAS_HEIGHT, SIM_DT, SCALE,
   FLIGHT_SPEED_MIN, FLIGHT_SPEED_MAX, FLIGHT_SPEED_STEP, FLIGHT_SPEED_STEP_HI, FLIGHT_SPEED_STEP_BREAK,
-  ROCKET_ACCEL_MIN, ROCKET_ACCEL_MAX, ROCKET_ACCEL_STEP,
+  ROCKET_ACCEL_MIN, ROCKET_ACCEL_MAX, ROCKET_ACCEL_STEP, LEGENDARY_FLYOFF,
 } from "./state.js";
 import { AiPolicy, setGrassSprites, getSpawningY } from "./bridge.js";
 import { modeLabel, stageWidth } from "./modes.js";
@@ -307,6 +307,13 @@ function renderRecordsMenu() {
     };
     const sc = stat("rec-stat", String(r.bestScore || "—"), r.globalScore,
                     r.globalScore ? "best score on any map" : "best score on this map");
+    const legend = r.bestScoreParts && r.bestScoreParts.flyoff >= LEGENDARY_FLYOFF;   // clean track only
+    if (legend) {
+      const g = document.createElement("span");
+      g.className = "rec-legend"; g.textContent = " ✦";
+      g.title = `Legendary fly-off: ${r.bestScoreParts.flyoff} points past the finish`;
+      sc.appendChild(g);
+    }
     const tm = stat("rec-stat time", fmtTime(r.bestTime), r.globalTime,
                     r.globalTime ? "fastest finish on any map" : (r.bestTime == null ? "not finished yet" : "fastest finish on this map"));
     if (show) {
@@ -360,6 +367,10 @@ function renderRecordsMenu() {
       const aft = line.querySelector(".p-aft");
       aft.textContent = pt.after ? `↗${pt.after}` : "0";
       aft.classList.toggle("hot", pt.after > 0);
+      if (!cheated && pt.flyoff >= LEGENDARY_FLYOFF) {
+        line.querySelector(".p-fly").classList.add("legend");
+        line.insertAdjacentHTML("beforeend", ' · <span class="legend">✦ legendary fly-off</span>');
+      }
       box.appendChild(line);
     }
     list.appendChild(box);

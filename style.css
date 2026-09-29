@@ -291,6 +291,8 @@ details.tune-sec .toggle { font-size: 12px; padding: 5px 10px; color: var(--mute
 .rec-parts .cheat b { color: #ff6b6b; }
 .rec-parts span { color: var(--text); font-weight: 800; }
 .rec-parts .hot { color: #ff6b6b; }
+.rec-parts .legend, .rec-row .rec-legend { color: #ffd27f; }
+.rec-row .rec-legend { font-family: var(--ui); font-size: 13px; }
 .terrain-row.rec-head { background: none !important; color: var(--muted); font-size: 11px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.8px; padding-top: 0; padding-bottom: 2px; }
 .rec-head span:nth-child(3), .rec-head span:nth-child(4) { text-align: right; }

@@ -4,7 +4,7 @@
 // colors. The physics classes' own p5 show() methods are used only by legacy_neat/.
 import {
   S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE, SIM_DT,
-  AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
+  AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR, LEGENDARY_FLYOFF,
 } from "./state.js";
 import { scoreOf, scorePx, scoreParts, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
@@ -509,12 +509,17 @@ function _timeBadge(p) {
   return _cheatBadge(r, r.allGlobalTime, r.allMapTime, S.recStart && S.recStart.all.time != null);
 }
 // Score breakdown row for a finished run that kept going past the natural fly-off
-// (cheats only): to finish · fly-off · after, the last part red.
+// (cheats only; last part red) or had a legendary clean fly-off (gold ✦).
+const GOLD = "#ffd27f";
 function _partsRows(p) {
   const pt = p && scoreParts(p);
-  if (!pt || !pt.after) return [];
-  return [["Split: to finish · fly-off · after", [[`${pt.toFinish}  ·  ${pt.flyoff} (${pt.flyoffSec.toFixed(1)}s)  ·  `, "#c9d4e2"],
-                                                  [`↗${pt.after}`, CHEAT_RED]]]];
+  if (!pt) return [];
+  const legend = !S.runTainted && pt.flyoff >= LEGENDARY_FLYOFF;
+  if (!pt.after && !legend) return [];
+  const fly = `${pt.flyoff} (${pt.flyoffSec.toFixed(1)}s)`;
+  return [[legend ? "✦ Legendary fly-off · split" : "Split: to finish · fly-off · after",
+           [[`${pt.toFinish}  ·  `, "#c9d4e2"], [legend ? `✦${fly}` : fly, legend ? GOLD : "#c9d4e2"],
+            ["  ·  ", "#c9d4e2"], pt.after ? [`↗${pt.after}`, CHEAT_RED] : ["0", "#c9d4e2"]]]];
 }
 function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeconds(p)) : "DNF"}`; }
 
@@ -522,7 +527,7 @@ function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeco
 function _buildEndCard() {
   let ai = null, hum = null;
   for (const p of S.players) { if (p.isAI) ai = p; else hum = p; }
-  const WIN = "#7dffa6", LOSE = "#ff8a80", GOLD = "#ffd27f";
+  const WIN = "#7dffa6", LOSE = "#ff8a80";
   const card = { rows: [], hint: HINT };
   const taintNote = "Cheats were on — counts only toward cheat records";
   if (S.mode === "vs" && hum && ai) {
