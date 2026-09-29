@@ -40,6 +40,8 @@ export const HUMAN_COLOR = { outline: "#fc5", torso: "#c8783c", shirtR: 200, shi
 // distinct so each player can spot both cars on the shared terrain.
 export const HUMAN_L_COLOR = HUMAN_COLOR;
 export const HUMAN_R_COLOR = { outline: "#6f6", torso: "#2f8f2f", shirtR: 90, shirtG: 190, shirtB: 90 };
+// Dev mode's second AI ("AI B" in AI vs AI).
+export const AI2_COLOR = { outline: "#e8f", torso: "#9a3cc8", shirtR: 170, shirtG: 80, shirtB: 200 };
 
 // --- Cheat / bug-probe tuning ---
 export const BP_MAX_LEN = 12000;   // ring-buffer cap (~6.7 min at 30 fps)
@@ -66,6 +68,7 @@ export const S = {
   paused: false,
   simSpeed: 1,            // set via the Speed dropdown or Shift+Scroll
   aiAgent: null,          // Agent instance from ai_policy.js (PpoOnnxAgent by default)
+  aiAgent2: null,         // dev mode: "AI B" (its own instance — agents hold per-episode state)
   mode: "ai",             // key into modes.MODES
 
   // Best of X + replay
@@ -118,6 +121,12 @@ export const S = {
   bpReverse: false,       // reversed movement controls cheat (K)
   flightSpeed: 20,        // m/s, scroll-adjustable
   rocketAccel: 20,        // m/s^2, scroll-adjustable
+
+  // Dev mode (see dev.js)
+  devMode: false,         // unlocked with the password
+  devVision: false,       // AI-vision overlay
+  devB2D: false,          // Box2D debug draw
+  inStep: false,          // a runOneStep is in flight (dev frame-step must not overlap it)
 
   // Loop timing
   accumSec: 0,

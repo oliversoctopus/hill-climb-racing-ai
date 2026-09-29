@@ -243,11 +243,13 @@ function spawnPlayers(spawnDx, spawnDy) {
   const out = [];
   for (let i = 0; i < defs.length; i++) {
     const d = defs[i];
-    const agent = (d.agent === "ai") ? S.aiAgent : null;
+    if (d.agent === "ai2" && !S.aiAgent2) continue;   // AI B not loaded (dev mode off)
+    const agent = (d.agent === "ai") ? S.aiAgent : (d.agent === "ai2") ? S.aiAgent2 : null;
     const dx = (d.agent === "ai") ? (spawnDx || 0) : 0;
     const dy = (d.agent === "ai") ? (spawnDy || 0) : 0;
     const p = makePlayer(agent, spawnColor(d), dx, dy);
     if (d.control) p.control = d.control;
+    if (d.agent === "ai2") p.aiB = true;
     out.push(p);
   }
   return out;

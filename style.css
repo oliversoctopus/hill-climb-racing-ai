@@ -220,6 +220,22 @@ details.pop[open] > .pop-body {
 #advanced_panel .dbg { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 2; }
 #advanced_panel .dbg input { width: 64px; padding: 3px 6px; }
 #bp_live { font-family: ui-monospace, monospace; color: #9f9; }
+/* Dev mode (game/dev.js): .dev-only stays hidden until body.dev */
+body:not(.dev) .dev-only { display: none !important; }
+body.dev .dev-unlock { display: none; }
+#dev_section { border: 1px solid #6a4fa0; border-radius: 12px; padding: 4px 10px 6px; margin-top: 18px; background: rgba(120, 80, 200, 0.08); }
+#dev_section .dbg { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 2; }
+#dev_section .dbg button { padding: 4px 8px; font-size: 12px; }
+#dev_section .dbg b { color: var(--text, #e6edf7); }
+.dev-head { display: flex; justify-content: space-between; align-items: center; }
+.dev-head h3 { margin: 10px 0 6px; color: #c9a8ff; }
+.dev-head button { padding: 3px 10px; font-size: 12px; }
+.dev-unlock { display: block; margin: 22px auto 0; padding: 3px 10px; font-size: 11px; opacity: 0.45;
+  background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.dev-unlock:hover { opacity: 1; }
+.dev-form { display: flex; gap: 8px; justify-content: center; }
+.dev-form input { width: 220px; padding: 6px 10px; }
+#dev_err { color: #ff8a80; min-height: 18px; margin: 8px 0 0; }
 /* Physics playground (game/tune.js builds the rows) */
 .tune-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px; }
 .tune-preset-btns { display: flex; flex-wrap: wrap; gap: 6px; }

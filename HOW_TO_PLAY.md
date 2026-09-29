@@ -179,13 +179,14 @@ plays X attempts headless (no rendering) on one fixed map, then the results
 dropdown lets you **Watch** any attempt, ranked from best to worst. **🎲
 New map** re-rolls the shared map and clears old runs.
 
-## 7. Tools drawer: readouts, cheats, bug probe
+## 7. Tools drawer: readouts, cheats, physics playground
 
 The **🛠 Tools** drawer holds **Readouts** (Altimeter, Velocity, Current distance —
-read-only, not cheats), **Cheats**, **Messages**, and a collapsed **🐞 Debug** panel. The
+read-only, not cheats), **Cheats**, **Messages**, the collapsed **🧪 Physics playground**,
+and (unlocked) the **🔧 Dev mode** tools (§8). The
 **info readouts and cheats** — Altimeter, Velocity, Distance, Invincible, Zero-G + Float,
 Underworld, and the physics/motor knobs — apply to **every car on screen, the AI included, in
-all modes** (even AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
+all modes** (even AI-only). The dev-mode bug probe logs the **human** car, so
 for *recording* use **You drive** mode. Nothing here persists or touches the
 source physics — it's all runtime, so AI/browser parity and the deployed model
 are unaffected (no retrain implied).
@@ -250,13 +251,39 @@ are unaffected (no retrain implied).
   "↺ restart to apply" / "🎲 new map to apply" and a message reminds you. Presets
   (Moon, Ice rink, Trampoline, Monster truck, Bobblehead) stack; **Reset all** restores
   stock. Values reset on page reload.
-- **Debugging only** (bottom of that panel): **🔥 Unmask** (strip damping + stiff,
-  under-damped suspension → exposes a suspension-resonance instability) and
-  **🌀 Motor-spin** (motor speed ×2 → the chassis winds into a sustained counter-spin
-  while driving — motor *speed*, not torque/friction, is that lever), then the bug
-  probe: **⚑ Flag unusual** marks the current tick so the moment is easy to find, and
+## 8. Dev mode (password)
+
+The small **🔒 Dev** button at the bottom of the Tools drawer (or opening the page with
+`?dev`) asks for the dev password. Once unlocked, the browser remembers it (localStorage)
+until you press **Lock**. The password only hides these tools: it's checked client-side
+and the code ships to everyone. Unlocking adds a **🔧 Dev mode** section to the drawer and an
+**AI vs AI** mode tab:
+
+- **AI vision:** the policy's 6 look-ahead probes drawn on the terrain (label = probe:clearance
+  in m, colour red→green = near→far, dashed = clipped to the obs range), a green ring on each
+  wheel the policy currently sees as grounded (coyote time included), and a panel with the
+  FWD/REV/OFF softmax probabilities plus the newest raw obs values.
+- **Box2D debug draw:** every fixture (green dynamic, orange static, blue sensor), joints
+  (cyan), contact points + normals (red), centre of mass + velocity (yellow), and a panel
+  with body/joint/contact counts and the torso joint angle against its −70.6°/+104.5° limits.
+- **Time:** **.** pauses and steps one physics tick (hold to repeat). **Q** quick-saves the
+  whole sim and **L** loads it back. A load marks the run as cheated. Every load replays the
+  same future exactly, but not quite the original run, because Box2D's warm-start caches
+  aren't saved.
+- **Models:** **Load main AI… / Load AI B…** take an `.onnx` plus its `policy_meta.json`
+  (select both; without the meta, the deployed one is used). The main AI drives every mode,
+  Best of X and the search too. **AI vs AI** races main vs B on one map. **Both → deployed** reverts.
+- **Map JSON:** Copy / Download / Paste / Open the current map (vertices in px + spawn +
+  grass). Import also accepts Python's `Ground.save_json` output and bug-probe recordings.
+  In Python, `python autorun/backtrack_search.py --map-json hcr_map_X.json` searches that exact
+  map (`Ground.load_json` reads the format).
+- **Spin-investigation presets:** **🔥 Unmask** (strip damping + stiff, under-damped
+  suspension → exposes a suspension-resonance instability) and **🌀 Motor-spin** (motor
+  speed ×2 → the chassis winds into a sustained counter-spin while driving — motor *speed*,
+  not torque/friction, is that lever).
+- **Bug probe:** **⚑ Flag unusual** marks the current tick so the moment is easy to find, and
   **Download recording** exports `hcr_bugrun_*.json` (ticks + flags + terrain + every
-  playground knob) for offline analysis.
+  playground knob) for offline analysis. The recorder itself is always on.
 
 ## Troubleshooting
 

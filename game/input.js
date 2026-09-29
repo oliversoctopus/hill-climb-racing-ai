@@ -106,6 +106,7 @@ export function _handleActionKey(e) {
     document.getElementById("terrains_panel").style.display = "none";
     document.getElementById("saved_panel").style.display = "none";
     document.getElementById("records_panel").style.display = "none";
+    document.getElementById("dev_panel").style.display = "none";
     document.getElementById("drawer").classList.remove("open");
     return;
   }

@@ -11,7 +11,7 @@
 //   split        true => side-by-side split screen (2x-wide canvas, per-side HUD)
 //   bestofxPanel true => show the Best-of-X controls panel
 import {
-  S, CANVAS_WIDTH, AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
+  S, CANVAS_WIDTH, AI_COLOR, AI2_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR,
 } from "./state.js";
 
 export const MODES = {
@@ -43,13 +43,19 @@ export const MODES = {
     spawn: [{ agent: "ai" }],
     split: false, bestofxPanel: true,
   },
+  // Dev mode only: the main AI vs "AI B" (a second, separately loadable model).
+  aivai: {
+    label: "AI vs AI (dev) — main AI vs AI B",
+    spawn: [{ agent: "ai" }, { agent: "ai2", color: AI2_COLOR }],
+    split: false, bestofxPanel: false,
+  },
 };
 
 export function modeDef(m) { return MODES[m] || MODES.ai; }
 
 // Default color for a spawn entry that doesn't override it.
 export function spawnColor(def) {
-  return def.color || (def.agent === "ai" ? AI_COLOR : HUMAN_COLOR);
+  return def.color || (def.agent === "human" ? HUMAN_COLOR : AI_COLOR);
 }
 
 // Status-line label for the current mode.

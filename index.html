@@ -26,6 +26,7 @@
     <button data-mode="vs" title="Race the AI on the same map (Alt+3)">You vs AI</button>
     <button data-mode="hvh" title="Two players, split screen: WASD vs arrows (Alt+4)">2 players</button>
     <button data-mode="bestofx" title="Run the AI X times and keep the best (Alt+5)">Best of X</button>
+    <button data-mode="aivai" class="dev-only" title="Dev: main AI vs AI B on the same map">AI vs AI</button>
   </nav>
   <select id="mode" aria-hidden="true" tabindex="-1">
     <option value="ai">AI only</option>
@@ -33,6 +34,7 @@
     <option value="vs">Human vs AI</option>
     <option value="hvh">Human vs Human (split)</option>
     <option value="bestofx">Best of X (AI)</option>
+    <option value="aivai">AI vs AI (dev)</option>
   </select>
   <div class="topbar-right">
     <button id="keybinds_btn" class="ghost" title="Keyboard shortcuts">⌨ Keys</button>
@@ -162,7 +164,7 @@
   <span id="bp_status"></span>
 
   <details id="advanced_panel">
-    <summary>🧪 Physics playground &amp; debug</summary>
+    <summary>🧪 Physics playground</summary>
     <div class="tune-presets">
       <span class="dbg-lbl">Presets (they stack):</span>
       <div id="tune_presets" class="tune-preset-btns"></div>
@@ -170,7 +172,34 @@
     </div>
     <div id="tune_root"></div>
     <p class="note">Changes affect every car, the AI included (it was trained on stock physics, so expect chaos). Any change makes the run count toward cheat records only. Double-click a knob's name to reset it.</p>
-    <h3>Debugging only</h3>
+  </details>
+
+  <!-- Dev mode (game/dev.js): hidden until unlocked with the password. -->
+  <section id="dev_section" class="dev-only">
+    <div class="dev-head"><h3>🔧 Dev mode</h3><button id="dev_lock" class="ghost" title="Hide the dev tools again">Lock</button></div>
+    <label class="toggle" title="Draw the AI's look-ahead probes, wheel-contact flags and action probabilities"><input type="checkbox" id="dev_vision"><span class="sw"></span>AI vision</label>
+    <label class="toggle" title="Draw Box2D shapes, joints, contact points and velocities"><input type="checkbox" id="dev_b2d"><span class="sw"></span>Box2D debug draw</label>
+    <div class="dbg">
+      Time (<kbd>.</kbd> step · <kbd>Q</kbd> save · <kbd>L</kbd> load):<br>
+      <button id="dev_step" title="Pause and advance exactly one physics tick (.)">⏭ Step tick</button>
+      <button id="dev_qsave" title="Save the whole sim state (Q)">💾 Quick-save</button>
+      <button id="dev_qload" title="Restore the quick-save (L) — the run then counts as cheated">⤺ Quick-load</button>
+    </div>
+    <div class="dbg">
+      Models — main: <b id="dev_model_a">deployed</b> · AI B: <b id="dev_model_b">deployed</b><br>
+      <button id="dev_load_a" title="Pick an .onnx and its policy_meta.json">Load main AI…</button>
+      <button id="dev_load_b" title="Pick an .onnx and its policy_meta.json">Load AI B…</button>
+      <button id="dev_models_reset">Both → deployed</button>
+      <input type="file" id="dev_model_file" accept=".onnx,.json" multiple hidden>
+    </div>
+    <div class="dbg">
+      Map JSON (loads in the Python harness: <code>--map-json</code>):<br>
+      <button id="dev_map_copy">Copy</button>
+      <button id="dev_map_dl">Download</button>
+      <button id="dev_map_paste">Paste</button>
+      <button id="dev_map_open">Open file…</button>
+      <input type="file" id="dev_map_file" accept=".json" hidden>
+    </div>
     <div class="dbg">
       Spin-investigation presets:<br>
       <button id="bp_unmask" class="danger" title="No damping + stiff under-damped suspension: exposes the suspension-resonance spin">🔥 Unmask</button>
@@ -182,8 +211,19 @@
       <button id="bp_download">Download recording</button><br>
       <span id="bp_live"></span>
     </div>
-  </details>
+  </section>
+  <button id="dev_unlock_btn" class="dev-unlock" title="Developer tools (password)">🔒 Dev</button>
 </aside>
+
+<div id="dev_panel" class="hcr-modal">
+  <div class="modal-title">🔒 Dev mode</div>
+  <form id="dev_form" class="dev-form" autocomplete="off">
+    <input id="dev_pw" type="password" placeholder="Password" aria-label="Dev password">
+    <button type="submit" class="primary">Unlock</button>
+  </form>
+  <div id="dev_err" class="modal-note"></div>
+  <div class="modal-footer"><button id="dev_close">Cancel (Esc)</button></div>
+</div>
 
 <div id="keybinds_panel" class="hcr-modal" style="display:none;">
   <div class="modal-title">⌨ Keyboard shortcuts</div>
@@ -212,6 +252,9 @@
     <tr><td><kbd>G</kbd></td><td>Flight: ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed</td></tr>
     <tr><td><kbd>J</kbd></td><td>Rocket: ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
     <tr><td><kbd>K</kbd></td><td>Reverse controls (mirrors every movement key)</td></tr>
+    <tr class="sec dev-only"><td colspan="2">Dev mode</td></tr>
+    <tr class="dev-only"><td><kbd>.</kbd></td><td>Pause + step one physics tick (hold to repeat)</td></tr>
+    <tr class="dev-only"><td><kbd>Q</kbd> / <kbd>L</kbd></td><td>Quick-save / quick-load the sim state</td></tr>
   </table>
   <div class="modal-footer"><button id="keybinds_close">Close (Esc)</button></div>
 </div>

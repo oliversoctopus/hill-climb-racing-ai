@@ -4,8 +4,9 @@
 // colors. The physics classes' own p5 show() methods are used only by legacy_neat/.
 import {
   S, SCALE, SPAWN_X, CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_RATE, SIM_DT,
-  AI_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR, LEGENDARY_FLYOFF,
+  AI_COLOR, AI2_COLOR, HUMAN_COLOR, HUMAN_L_COLOR, HUMAN_R_COLOR, LEGENDARY_FLYOFF,
 } from "./state.js";
+import { drawDevWorld, drawDevHUD } from "./dev.js";
 import { scoreOf, scorePx, scoreParts, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
@@ -321,8 +322,17 @@ function _progressFor(ctx, cx, players) {
 // Live-play HUD for the single-screen modes: your panel top-left, the AI's top-right
 // when racing it; the progress bar top-center.
 function _drawSingleScoreHUD(ctx) {
-  let ai = null, hum = null;
-  for (let i = 0; i < S.players.length; i++) { if (S.players[i].isAI) ai = S.players[i]; else hum = S.players[i]; }
+  let ai = null, hum = null, aiB = null;
+  for (let i = 0; i < S.players.length; i++) {
+    const p = S.players[i];
+    if (p.aiB) aiB = p; else if (p.isAI) ai = p; else hum = p;
+  }
+  if (aiB) {   // dev AI vs AI: main AI top-left, AI B top-right
+    _progressFor(ctx, CANVAS_WIDTH / 2, ai ? [ai, aiB] : [aiB]);
+    if (ai) drawPlayerPanel(ctx, 16, 14, _panelFor(ai, "Main AI", AI_COLOR));
+    drawPlayerPanel(ctx, CANVAS_WIDTH - 16 - PANEL_W, 14, _panelFor(aiB, "AI B", AI2_COLOR));
+    return;
+  }
   const order = [];
   if (hum) order.push(hum);
   if (ai) order.push(ai);
@@ -525,12 +535,21 @@ function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeco
 
 // End card for the single-screen modes, built once when everyone is dead.
 function _buildEndCard() {
-  let ai = null, hum = null;
-  for (const p of S.players) { if (p.isAI) ai = p; else hum = p; }
+  let ai = null, hum = null, aiB = null;
+  for (const p of S.players) { if (p.aiB) aiB = p; else if (p.isAI) ai = p; else hum = p; }
   const WIN = "#7dffa6", LOSE = "#ff8a80";
   const card = { rows: [], hint: HINT };
   const taintNote = "Cheats were on — counts only toward cheat records";
-  if (S.mode === "vs" && hum && ai) {
+  if (aiB && ai) {   // dev AI vs AI
+    let aWins = null;
+    if (ai.beatTick || aiB.beatTick) aWins = ai.beatTick && (!aiB.beatTick || ai.beatTick <= aiB.beatTick);
+    else if (scoreOf(ai) !== scoreOf(aiB)) aWins = scoreOf(ai) > scoreOf(aiB);
+    card.title = aWins === null ? "TIE!" : aWins ? "MAIN AI WINS" : "AI B WINS";
+    card.color = GOLD;
+    card.subtitle = (ai.beatTick || aiB.beatTick) ? "First to the finish wins" : "Nobody finished — farthest run wins";
+    card.rows.push(["Main AI  (score · time)", _runLine(ai)], ..._partsRows(ai));
+    card.rows.push(["AI B  (score · time)", _runLine(aiB)], ..._partsRows(aiB));
+  } else if (S.mode === "vs" && hum && ai) {
     let humanWins;
     if (hum.beatTick || ai.beatTick) {
       humanWins = hum.beatTick && (!ai.beatTick || hum.beatTick <= ai.beatTick);
@@ -649,6 +668,7 @@ function _renderSingle(ctx, alpha, now) {
       _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
                _playerDrawPose(S.players[pi], alpha));
     }
+    drawDevWorld(ctx, CANVAS_WIDTH);
   }
   ctx.restore();
 
@@ -676,6 +696,7 @@ function _renderSingle(ctx, alpha, now) {
 
   _drawSingleScoreHUD(ctx);
   if (focus && focus.car) drawCheatHUD(ctx, cheatTargetFromCar(focus.car), CANVAS_WIDTH / 2, 74);
+  drawDevHUD(ctx, CANVAS_WIDTH, S.players);
 
   const allDead = S.players.length > 0 && S.players.every(p => p.dead);
   if (!allDead) { _allDeadAt = 0; _endCard = null; _recCache = null; return; }
@@ -709,9 +730,11 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   for (let pi = 0; pi < S.players.length; pi++)
     _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
              _playerDrawPose(S.players[pi], alpha));
+  drawDevWorld(ctx, viewWidth);
   ctx.restore();
 
   _progressFor(ctx, viewWidth / 2, [ownP, oppP]);
+  drawDevHUD(ctx, viewWidth, [ownP]);
   const bottom = drawPlayerPanel(ctx, 16, 14, _panelFor(ownP, ownName, ownColor));
   drawPlayerPanel(ctx, viewWidth - 16 - PANEL_W, 14, { ..._panelFor(oppP, oppName, oppColor), lines: [] });
   _taintTag(ctx, 16, bottom + 8);

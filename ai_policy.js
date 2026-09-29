@@ -107,7 +107,17 @@
       throw new Error(`policy_meta.json fetch failed (${metaPath}): ${e.message} — serve over http:// (not file://) and re-export the model.`);
     }
     if (!resp.ok) throw new Error(`policy_meta.json not found at ${metaPath} (HTTP ${resp.status})`);
-    const meta = await resp.json();
+    await this._initWith(await resp.json(), this.modelPath);
+  };
+
+  // Init from in-memory bytes (dev mode's "load a model file"): meta = parsed JSON,
+  // modelBytes = Uint8Array of the .onnx. Same validation as init().
+  PpoOnnxAgent.prototype.initFromBytes = async function(modelBytes, meta) {
+    if (typeof ort === "undefined") throw new Error("ONNX Runtime Web (ort.min.js) not loaded before agent init");
+    await this._initWith(meta, modelBytes);
+  };
+
+  PpoOnnxAgent.prototype._initWith = async function(meta, modelSrc) {
     validateMeta(meta);
     this.meta = meta;
     this._obsScratch = new Float32Array(meta.n_obs);
@@ -118,7 +128,7 @@
     // isolation HTTP headers which our static server doesn't set.
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.simd = true;
-    this.session = await ort.InferenceSession.create(this.modelPath, {
+    this.session = await ort.InferenceSession.create(modelSrc, {
       executionProviders: ["wasm"],
     });
 
@@ -129,7 +139,7 @@
         observation: new ort.Tensor("float32", new Float32Array(meta.input_width), [1, meta.input_width]),
       });
     } catch (e) {
-      throw new Error(`policy_meta.json input_width ${meta.input_width} does not match the ONNX model input (${this.modelPath}): ${e.message}`);
+      throw new Error(`policy_meta.json input_width ${meta.input_width} does not match the ONNX model input (${typeof modelSrc === "string" ? modelSrc : "uploaded model"}): ${e.message}`);
     }
   };
 
@@ -137,6 +147,7 @@
     this._lastGroundedRear = 0;
     this._lastGroundedFront = 0;
     this._frameStack = [];
+    this.lastLogits = null;
   };
 
   // Snapshot / restore the agent's resumable per-episode state (frame stack +
@@ -167,6 +178,7 @@
     let a = ACT.FORWARD;
     if (logits[ACT.REVERSE] > logits[a]) a = ACT.REVERSE;
     if (logits[ACT.OFF]     > logits[a]) a = ACT.OFF;
+    this.lastLogits = logits;   // read by dev mode's AI-vision overlay; not used for acting
     return a;
   };
 

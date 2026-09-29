@@ -22,6 +22,7 @@ import {
 } from "./cheats.js";
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 import { buildTunePanel, setTune, resetTune, TUNE_PRESETS } from "./tune.js";
+import { initDevMode, devAfterInit } from "./dev.js";
 
 export function setStatus(s) { document.getElementById("status").textContent = s; }
 
@@ -101,7 +102,9 @@ async function loop() {
   if (!S.paused && S.aiAgent && !S.bestofxBusy) {
     S.accumSec += realDt * S.simSpeed;
     while (S.accumSec >= SIM_DT) {
+      S.inStep = true;
       const allDead = await runOneStep();
+      S.inStep = false;
       S.accumSec -= SIM_DT;
       didStep = true;
       if (allDead) { S.accumSec = 0; break; }
@@ -137,6 +140,8 @@ async function init() {
     setStatus(`ERROR loading agent: ${e.message}`);
     throw e;
   }
+
+  devAfterInit();   // dev mode: loads AI B in the background if already unlocked
 
   setStatus("Building simulation...");
   buildSimulation();
@@ -714,6 +719,7 @@ document.getElementById("bp_unmask").onclick = () =>
   setTune({ chassisAngDamp: 0, wheelAngDamp: 0, suspFreq: 200, suspDamp: 0.3 });
 // Motor-spin: double the motor's target speed — floor it to provoke the sustained CCW spin.
 document.getElementById("bp_motorspin").onclick = () => setTune({ motorSpeed: 2 });
+initDevMode({ loadTerrain: loadTerrainObject });
 
 // Keybinds cheat-sheet overlay.
 document.getElementById("keybinds_btn").onclick = () => {
