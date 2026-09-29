@@ -105,6 +105,8 @@ export function _handleActionKey(e) {
     document.getElementById("teleport_panel").style.display = "none";
     document.getElementById("terrains_panel").style.display = "none";
     document.getElementById("saved_panel").style.display = "none";
+    document.getElementById("records_panel").style.display = "none";
+    document.getElementById("drawer").classList.remove("open");
     return;
   }
   if (_isFormField(e.target)) return;   // don't fire shortcuts while typing in a field

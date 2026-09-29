@@ -119,6 +119,12 @@ export const S = {
   currentTerrainName: "",   // name shown in the "current terrain" box (Terrain N, or a loaded name)
   currentTerrainUnsaved: false,   // true => current map's saved copy was deleted; box shows "(unsaved)"
 
+  // Records (see records.js)
+  mapKey: "",               // geometry hash of the current map
+  runTainted: false,        // a cheat / slow-mo was used this run → don't record it
+  recStart: null,           // { map, global } records as they stood when the run began
+  bpPhysModified: false,    // debug physics/motor knobs are off their defaults
+
   // Image assets (loaded once at init)
   assets: {},
 };

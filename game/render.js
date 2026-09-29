@@ -9,6 +9,10 @@ import {
 import { scoreOf, scorePx, curScoreOf, _vehicleBodies, _vehicleCoM } from "./sim.js";
 import { modeDef, stageWidth } from "./modes.js";
 import { altitudeAboveKillLine } from "./geom.js";
+import { drawBackground, fillDirt, drawFinishFlag, drawBestFlag, finishPx } from "./scenery.js";
+import { drawPlayerPanel, drawProgressBar, drawTag, drawReadout, drawEndCard, PANEL_W } from "./hud.js";
+import { emitDust, stepFx, shake, shakeOffset, burstConfetti, drawDust, drawConfetti, clearFx } from "./fx.js";
+import { runSeconds, fmtTime, mapRecord, globalRecord } from "./records.js";
 
 // ---- Fixed-timestep render smoothing -------------------------------------
 // Physics steps at a fixed 30 Hz; render() runs every rAF, drawing each body at
@@ -185,16 +189,10 @@ function _followCamera(cam, focusX, focusYworld, anchorX) {
 
 // Draw sky + ground + grass for the current global cameraPanX/cameraPanY into a
 // viewport `viewWidth` px wide (local coords; caller sets up clip/translate).
-function _drawScenery(ctx, viewWidth) {
+function _drawScenery(ctx, viewWidth, timeSec) {
   const assets = S.assets;
   const ground = S.ground;
-  // Sky — fills the viewport. Doesn't pan (matches original sketch.js:411).
-  if (assets.sky) {
-    ctx.drawImage(assets.sky, 0, 0, viewWidth, CANVAS_HEIGHT);
-  } else {
-    ctx.fillStyle = "#87ceeb";
-    ctx.fillRect(0, 0, viewWidth, CANVAS_HEIGHT);
-  }
+  drawBackground(ctx, viewWidth);
 
   // Ground (dirt fill + grass line). Walk only the visible vertex slice. Track vertex
   // INDICES so we can place grass sprites at the same indices.
@@ -211,16 +209,17 @@ function _drawScenery(ctx, viewWidth) {
     topIdx.push(i);
   }
   if (topPts.length >= 2) {
-    ctx.fillStyle = "#582300";
+    const bottom = CANVAS_HEIGHT + 60;   // overdraw for screen shake
     ctx.beginPath();
     ctx.moveTo(topPts[0][0], topPts[0][1]);
     for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1]);
-    ctx.lineTo(topPts[topPts.length-1][0], CANVAS_HEIGHT);
-    ctx.lineTo(topPts[0][0], CANVAS_HEIGHT);
+    ctx.lineTo(topPts[topPts.length-1][0], bottom);
+    ctx.lineTo(topPts[0][0], bottom);
     ctx.closePath();
-    ctx.fill();
+    fillDirt(ctx);
     // Main green grass band. Width + color match Code Bullet's Ground.show():
     // stroke(0,120,0) = #007800, strokeWeight(grassThickness*2) = 10 (centered).
+    ctx.lineJoin = "round";
     ctx.strokeStyle = "#007800"; ctx.lineWidth = 10;
     ctx.beginPath();
     ctx.moveTo(topPts[0][0], topPts[0][1]);
@@ -251,17 +250,17 @@ function _drawScenery(ctx, viewWidth) {
   if (ground.grassPositions && assets.grass && topIdx.length > 1) {
     const gp = ground.grassPositions;
     for (let k = 0; k < topIdx.length - 1; k++) {
-      var i = topIdx[k];
+      const i = topIdx[k];
       const sIdx = gp[2 * i];
       if (sIdx !== undefined && sIdx >= 0 && sIdx < assets.grass.length) {
-        var spr = assets.grass[sIdx];
+        const spr = assets.grass[sIdx];
         ctx.drawImage(spr,
           topPts[k][0] - spr.width / 2,
           topPts[k][1] - spr.height / 2 - 15);
       }
       const sIdx2 = gp[2 * i + 1];
       if (sIdx2 !== undefined && sIdx2 >= 0 && sIdx2 < assets.grass.length) {
-        var spr = assets.grass[sIdx2];
+        const spr = assets.grass[sIdx2];
         const midX = (topPts[k][0] + topPts[k+1][0]) / 2;
         const midY = (topPts[k][1] + topPts[k+1][1]) / 2;
         ctx.drawImage(spr,
@@ -270,48 +269,62 @@ function _drawScenery(ctx, viewWidth) {
       }
     }
   }
+
+  drawFinishFlag(ctx, viewWidth, timeSec);
+  if (_humanMode() && S.recStart) drawBestFlag(ctx, viewWidth, S.recStart.map.bestScore);
 }
 
-// On-screen score label in Code Bullet's style, with a dark outline so it stays
-// legible over sky and terrain.
-function _hudText(ctx, text, x, y, align, color, size) {
-  const px = size || 28;   // optional font size; defaults to the standard 28px HUD text
-  ctx.save();
-  ctx.textAlign = align;
-  ctx.font = `bold ${px}px monospace`;
-  ctx.lineJoin = "round";
-  ctx.lineWidth = px * 0.18;   // keep the outline proportional so smaller text isn't over-stroked
-  ctx.strokeStyle = "rgba(0,0,0,0.65)";
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = color;
-  ctx.fillText(text, x, y);
-  ctx.restore();
+// ---- HUD helpers -----------------------------------------------------------
+function _humanMode() { return modeDef(S.mode).spawn.some(d => d.agent === "human"); }
+function _progressFrac(px) {
+  const span = finishPx() - SPAWN_X;
+  return span > 0 ? Math.max(0, Math.min(1, (px - SPAWN_X) / span)) : 0;
+}
+// "Map best 1502 · ⏱ 1:58.20" / "… · no finish yet" / "No record …".
+function _bestLine(r, label) {
+  if (!r.bestScore) return `No record on this map yet`;
+  return `${label} ${r.bestScore}  ·  ${r.bestTime != null ? `⏱ ${fmtTime(r.bestTime)}` : "no finish yet"}`;
+}
+function _recValue(r) {
+  if (!r.bestScore) return "—";
+  return `${r.bestScore}  ·  ${r.bestTime != null ? fmtTime(r.bestTime) : "no finish"}`;
+}
+// Panel contents for one live player.
+function _panelFor(p, label, color) {
+  const lines = [];
+  if (!p.isAI && S.recStart) {
+    lines.push(_bestLine(S.recStart.map, "Map best"));
+  }
+  if (S.bpDistance) lines.push(`Distance now  ${curScoreOf(p)}`);
+  return { label, color: color.outline, score: scoreOf(p), time: fmtTime(runSeconds(p)), lines,
+           dead: p.dead && !p.beatTick, finished: !!p.beatTick };
+}
+function _taintTag(ctx, x, y) {
+  if (S.runTainted) drawTag(ctx, x, y, "⚠ CHEATS / SLOW-MO USED · RUN NOT RECORDED", "rgba(190,50,50,0.9)");
+}
+function _progressFor(ctx, cx, players) {
+  const markers = players.map(p => ({ frac: _progressFrac(p.maxDistPx), color: p.color.outline }));
+  const best = (_humanMode() && S.recStart && S.recStart.map.bestScore)
+    ? _progressFrac(S.recStart.map.bestScore * 10 + SPAWN_X) : null;
+  drawProgressBar(ctx, cx, 30, 360, markers, best);
 }
 
-// Distance (info readout): the CURRENT-position score, drawn just under a score label at
-// (x, y) when the toggle is on. Smaller than the score so it reads as a sub-line.
-function _drawDistanceUnder(ctx, curScore, x, y, align, color) {
-  if (!S.bpDistance) return;
-  _hudText(ctx, `Distance ${curScore}`, x, y + 26, align, color, 18);
-}
-
-// Live-play score HUD for the single-screen modes: your score top-left, and the AI's
-// top-right when racing it (mirrors the Human-vs-AI layout in sketch.js).
+// Live-play HUD for the single-screen modes: your panel top-left, the AI's top-right
+// when racing it; the progress bar top-center.
 function _drawSingleScoreHUD(ctx) {
   let ai = null, hum = null;
   for (let i = 0; i < S.players.length; i++) { if (S.players[i].isAI) ai = S.players[i]; else hum = S.players[i]; }
-  if (S.mode === "vs" && hum && ai) {
-    _hudText(ctx, `You — Score ${scoreOf(hum)}`, 24, 48, "left",  HUMAN_COLOR.outline);
-    _drawDistanceUnder(ctx, curScoreOf(hum), 24, 48, "left", HUMAN_COLOR.outline);
-    _hudText(ctx, `AI — Score ${scoreOf(ai)}`,  CANVAS_WIDTH - 24, 48, "right", AI_COLOR.outline);
-    _drawDistanceUnder(ctx, curScoreOf(ai), CANVAS_WIDTH - 24, 48, "right", AI_COLOR.outline);
-  } else if (S.mode === "human" && hum) {
-    _hudText(ctx, `Your Score: ${scoreOf(hum)}`, 24, 48, "left", HUMAN_COLOR.outline);
-    _drawDistanceUnder(ctx, curScoreOf(hum), 24, 48, "left", HUMAN_COLOR.outline);
-  } else if ((S.mode === "ai" || S.mode === "bestofx") && ai) {
-    _hudText(ctx, `AI Score: ${scoreOf(ai)}`, 24, 48, "left", AI_COLOR.outline);
-    _drawDistanceUnder(ctx, curScoreOf(ai), 24, 48, "left", AI_COLOR.outline);
+  const order = [];
+  if (hum) order.push(hum);
+  if (ai) order.push(ai);
+  _progressFor(ctx, CANVAS_WIDTH / 2, order);
+  let bottom = 0;
+  if (hum) bottom = drawPlayerPanel(ctx, 16, 14, _panelFor(hum, "You", HUMAN_COLOR));
+  if (ai) {
+    const b = drawPlayerPanel(ctx, hum ? CANVAS_WIDTH - 16 - PANEL_W : 16, 14, _panelFor(ai, "AI", AI_COLOR));
+    if (!hum) bottom = b;
   }
+  if (hum) _taintTag(ctx, 16, bottom + 8);
 }
 
 // ---- Readout cheats (altimeter, speed) ----------------------------------
@@ -408,28 +421,139 @@ function drawCheatHUD(ctx, target, centerX, topY) {
   for (let i = 0; i < CHEAT_HUD.length; i++) {
     const c = CHEAT_HUD[i];
     if (!c.on()) continue;
-    _hudText(ctx, c.line(target), centerX, y, "center", c.color, c.size);
-    y += 32;
+    drawReadout(ctx, c.line(target), centerX, y, c.color, c.size);
+    y += 30;
   }
   return y;
+}
+
+
+// ---- Effects bookkeeping -----------------------------------------------------
+let _fxLastMs = 0, _fxGen = -1;
+let _endCard = null;          // cached end-card spec for the current all-dead state
+let _allDeadAt = 0;           // wall ms when every player was first seen dead
+let _ghostFinish = null;      // { poses, idx } — first ghost frame past the finish
+
+function _endFade(since, now) { return since ? Math.max(0, Math.min(1, (now - since - 500) / 350)) : 0; }
+
+// Death → shake; first finish → confetti. Stamps wall times the end cards fade from.
+function _detectEvents(now) {
+  const hasHuman = S.players.some(p => !p.isAI);
+  for (const p of S.players) {
+    if (p.dead && !p._fxDeadAt) {
+      p._fxDeadAt = now;
+      if (!p.beatTick && (!p.isAI || !hasHuman)) shake(9, 0.35);
+    }
+    if (p.beatTick && !p._fxBeatAt) { p._fxBeatAt = now; burstConfetti(stageWidth()); }
+  }
+  if (S.ghostPoses && S.ghostBeaten) {
+    if (!_ghostFinish || _ghostFinish.poses !== S.ghostPoses) {
+      const fx = finishPx() / SCALE;
+      let idx = S.ghostPoses.findIndex(q => q.chassis.x >= fx);
+      _ghostFinish = { poses: S.ghostPoses, idx, fired: false };
+    }
+    if (!_ghostFinish.fired && _ghostFinish.idx >= 0 && S.ghostIdx >= _ghostFinish.idx) {
+      _ghostFinish.fired = true; burstConfetti(stageWidth());
+    }
+  }
+}
+
+function _ghostSeconds() {
+  const fin = (_ghostFinish && _ghostFinish.poses === S.ghostPoses && _ghostFinish.idx >= 0) ? _ghostFinish.idx : Infinity;
+  return Math.max(0, Math.min(S.ghostIdx, fin)) / FRAME_RATE;
+}
+
+const HINT = [["R", "Restart"], ["T", "New map"]];
+
+let _recCache = null;   // record rows, read once per end card (not every frame)
+function _recRows() {
+  if (_recCache) return _recCache;
+  const m = mapRecord(S.mapKey), g = globalRecord();
+  return (_recCache = [["Best on this map  (score · finish)", _recValue(m)],
+                       ["Best on any map  (score · finish)", _recValue(g)]]);
+}
+function _scoreBadge(p) {
+  const r = p.newRec || {};
+  if (r.globalScore) return "NEW RECORD";
+  if (r.mapScore && S.recStart && S.recStart.map.bestScore > 0) return "MAP BEST";
+  return null;
+}
+function _timeBadge(p) {
+  const r = p.newRec || {};
+  if (r.globalTime) return "NEW RECORD";
+  if (r.mapTime && S.recStart && S.recStart.map.bestTime != null) return "MAP BEST";
+  return null;
+}
+function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeconds(p)) : "DNF"}`; }
+
+// End card for the single-screen modes, built once when everyone is dead.
+function _buildEndCard() {
+  let ai = null, hum = null;
+  for (const p of S.players) { if (p.isAI) ai = p; else hum = p; }
+  const WIN = "#7dffa6", LOSE = "#ff8a80", GOLD = "#ffd27f";
+  const card = { rows: [], hint: HINT };
+  const taintNote = "Cheats were on — this run wasn't recorded";
+  if (S.mode === "vs" && hum && ai) {
+    let humanWins;
+    if (hum.beatTick || ai.beatTick) {
+      humanWins = hum.beatTick && (!ai.beatTick || hum.beatTick <= ai.beatTick);
+      card.subtitle = humanWins ? "You reached the finish first" : "The AI reached the finish first";
+    } else {
+      const hs = scoreOf(hum), as = scoreOf(ai);
+      humanWins = hs > as;
+      if (hs === as) { card.title = "TIE!"; card.color = GOLD; }
+      card.subtitle = humanWins ? "You went farther" : "The AI went farther";
+    }
+    if (!card.title) { card.title = humanWins ? "YOU WIN!" : "AI WINS"; card.color = humanWins ? WIN : LOSE; }
+    if (S.runTainted) card.subtitle = taintNote;
+    card.rows.push(["You  (score · time)", _runLine(hum), _scoreBadge(hum) || _timeBadge(hum)]);
+    card.rows.push(["AI  (score · time)", _runLine(ai)]);
+    card.rows.push(..._recRows());
+  } else if (hum) {
+    card.title = hum.beatTick ? "YOU BEAT THE GAME!" : "CRASHED!";
+    card.color = hum.beatTick ? WIN : LOSE;
+    card.subtitle = S.runTainted ? taintNote : (S.currentTerrainName || "");
+    card.rows.push(["Score", String(scoreOf(hum)), _scoreBadge(hum)]);
+    if (hum.beatTick) card.rows.push(["Finish time", fmtTime(runSeconds(hum)), _timeBadge(hum)]);
+    card.rows.push(..._recRows());
+  } else if (ai) {
+    card.title = ai.beatTick ? "AI BEAT THE GAME!" : "AI CRASHED";
+    card.color = ai.beatTick ? WIN : LOSE;
+    card.rows.push(["Score", String(scoreOf(ai))]);
+    card.rows.push(["Time", ai.beatTick ? fmtTime(runSeconds(ai)) : `${fmtTime(runSeconds(ai))} (crashed)`]);
+  }
+  return card;
 }
 
 export function render() {
   const cv = document.getElementById("stage");
   const ctx = cv.getContext("2d");
   const alpha = _renderAlpha();   // fraction of a tick between the last two physics states
+  const now = performance.now();
+  const dt = _fxLastMs ? Math.min(0.1, (now - _fxLastMs) / 1000) : 0;
+  _fxLastMs = now;
+  if (S.worldGen !== _fxGen) { _fxGen = S.worldGen; clearFx(); _endCard = null; _allDeadAt = 0; _recCache = null; }
+  if (!S.paused) {
+    stepFx(dt);
+    if (!S.ghostPoses) for (const p of S.players) emitDust(p, dt);
+  }
+  _detectEvents(now);
 
   // Human-vs-Human: two live cars on the same terrain, side-by-side split screen.
-  if (modeDef(S.mode).split && !S.ghostPoses && S.players.length >= 2) { renderSplit(ctx, alpha); return; }
+  if (modeDef(S.mode).split && !S.ghostPoses && S.players.length >= 2) renderSplit(ctx, alpha, now);
+  else _renderSingle(ctx, alpha, now);
+  drawConfetti(ctx);
+}
 
+function _renderSingle(ctx, alpha, now) {
   // Camera target: prefer the LIVING human so they can always see themselves; once the
   // human dies, hand off to the AI. Falls back to whatever's alive (or any player).
   let focus = null;
-  for (var pi = 0; pi < S.players.length; pi++) {
+  for (let pi = 0; pi < S.players.length; pi++) {
     if (!S.players[pi].isAI && !S.players[pi].dead) { focus = S.players[pi]; break; }
   }
   if (focus === null) {
-    for (var pi = 0; pi < S.players.length; pi++) {
+    for (let pi = 0; pi < S.players.length; pi++) {
       if (S.players[pi].isAI && !S.players[pi].dead) { focus = S.players[pi]; break; }
     }
   }
@@ -454,72 +578,60 @@ export function render() {
   _followCamera(S.cam0, focusX, focusYworld, SPAWN_X);
   S.cameraPanX = S.cam0.panX; S.cameraPanY = S.cam0.panY;   // publish to the globals the helpers read
 
-  _drawScenery(ctx, CANVAS_WIDTH);
-
-  // Cars: ghost replay draws the recorded pose stream; otherwise each live player.
+  const [ox, oy] = shakeOffset();
+  ctx.save();
+  ctx.translate(ox, oy);
+  _drawScenery(ctx, CANVAS_WIDTH, now / 1000);
+  drawDust(ctx);
   if (ghostPose) {
     _drawCarFromPose(ctx, ghostPose, AI_COLOR, S.ghostDims);
-    // Live AI score, top-left, same as the other modes (the ghost is the AI's run).
-    const gscore = scorePx(ghostPose.chassis.x * SCALE);
-    _hudText(ctx, `AI Score: ${gscore}`, 24, 48, "left", AI_COLOR.outline);
-    // Center readout cheats (altimeter/speed) — same HUD as every other mode.
-    drawCheatHUD(ctx, cheatTargetFromGhost(ghostPose, S.ghostIdx), CANVAS_WIDTH / 2, 48);
   } else {
-    for (var pi = 0; pi < S.players.length; pi++) {
+    for (let pi = 0; pi < S.players.length; pi++) {
       _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
                _playerDrawPose(S.players[pi], alpha));
     }
-    _drawSingleScoreHUD(ctx);   // on-screen score, Code Bullet style (top corners)
-    // Center readout cheats for the focused car (altimeter/speed), stacked at y=48.
-    if (focus && focus.car) drawCheatHUD(ctx, cheatTargetFromCar(focus.car), CANVAS_WIDTH / 2, 48);
+  }
+  ctx.restore();
+
+  if (ghostPose) {
+    const gx = ghostPose.chassis.x * SCALE;
+    const finished = _ghostFinish && _ghostFinish.idx >= 0 && S.ghostIdx >= _ghostFinish.idx;
+    drawProgressBar(ctx, CANVAS_WIDTH / 2, 30, 360, [{ frac: _progressFrac(gx), color: AI_COLOR.outline }], null);
+    drawPlayerPanel(ctx, 16, 14, { label: "AI · replay", color: AI_COLOR.outline, score: scorePx(gx),
+                                   time: fmtTime(_ghostSeconds()), lines: [], finished });
+    drawCheatHUD(ctx, cheatTargetFromGhost(ghostPose, S.ghostIdx), CANVAS_WIDTH / 2, 74);
+    if (S.ghostDone) {
+      ctx.fillStyle = "rgba(6,10,20,0.35)";
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      drawEndCard(ctx, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20, {
+        title: S.ghostBeaten ? "AI BEAT THE GAME!" : "AI'S BEST RUN",
+        color: S.ghostBeaten ? "#7dffa6" : "#ffd27f",
+        subtitle: S.ghostBeaten ? "Found by rewind-and-retry search" : "Search budget ran out before the finish",
+        rows: [["Score", String(Math.round(S.ghostScore))],
+               ["Time", S.ghostBeaten ? fmtTime(_ghostSeconds()) : "DNF"]],
+        hint: HINT,
+      });
+    }
+    return;
   }
 
-  if (S.ghostPoses) {
-    // Ghost mode: celebrate the beat at the end; never the "DEAD" prompt.
-    if (S.ghostDone) {
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.font = "44px monospace";
-      ctx.textAlign = "center";
-      if (S.ghostBeaten) {
-        ctx.fillStyle = "#7fffa0";
-        ctx.fillText(`✓ BEAT THE GAME — score ${Math.round(S.ghostScore)}`,
-                     CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-      } else {
-        ctx.fillStyle = "#ffd27f";
-        ctx.fillText(`AI's best run — score ${Math.round(S.ghostScore)} (not beaten)`,
-                     CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-      }
-    }
-  } else {
-    // If ALL players are dead, dim + show prompt. If someone BEAT the game (crossed the
-    // finish before falling in), celebrate the win instead of showing "DEAD".
-    let allDead = S.players.length > 0;
-    let beater = null;
-    for (var pi = 0; pi < S.players.length; pi++) {
-      if (!S.players[pi].dead) allDead = false;
-      if (S.players[pi].beatTick && (!beater || S.players[pi].beatTick < beater.beatTick)) beater = S.players[pi];
-    }
-    if (allDead) {
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.font = "48px monospace";
-      ctx.textAlign = "center";
-      if (beater) {
-        ctx.fillStyle = "#7fffa0";
-        const who = beater.isAI ? "AI BEAT THE GAME!" : "YOU BEAT THE GAME!";
-        ctx.fillText(`${who} — Restart or Regenerate`, CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
-      } else {
-        ctx.fillStyle = "white";
-        ctx.fillText("DEAD — Restart or Regenerate", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
-      }
-    }
-  }
+  _drawSingleScoreHUD(ctx);
+  if (focus && focus.car) drawCheatHUD(ctx, cheatTargetFromCar(focus.car), CANVAS_WIDTH / 2, 74);
+
+  const allDead = S.players.length > 0 && S.players.every(p => p.dead);
+  if (!allDead) { _allDeadAt = 0; _endCard = null; _recCache = null; return; }
+  if (!_allDeadAt) _allDeadAt = now;
+  const a = _endFade(_allDeadAt, now);
+  if (a <= 0) return;
+  if (!_endCard) _endCard = _buildEndCard();
+  ctx.fillStyle = `rgba(6,10,20,${(0.4 * a).toFixed(3)})`;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  drawEndCard(ctx, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20, { ..._endCard, alpha: a });
 }
 
 // Draw ONE split-screen half (a full standard-width screen): its own camera following
-// `ownP`, the shared world (both cars drawn), and a Human-vs-AI-style score HUD.
-function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppName, ownColor, oppColor, alpha) {
+// `ownP`, the shared world (both cars drawn), and this player's HUD.
+function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppName, ownColor, oppColor, alpha, now, bothDead) {
   const ownPose = _playerDrawPose(ownP, alpha);
   const fc = ownPose ? ownPose.chassis : ownP.car.chassisBody.GetPosition();
   _followCamera(cam, fc.x * SCALE, fc.y * SCALE, SPAWN_X);
@@ -529,127 +641,86 @@ function _drawViewport(ctx, cam, offsetX, viewWidth, ownP, oppP, ownName, oppNam
   ctx.beginPath(); ctx.rect(offsetX, 0, viewWidth, CANVAS_HEIGHT); ctx.clip();
   ctx.translate(offsetX, 0);
 
-  _drawScenery(ctx, viewWidth);
+  const [ox, oy] = shakeOffset();
+  ctx.save();
+  ctx.translate(ox, oy);
+  _drawScenery(ctx, viewWidth, now / 1000);
+  drawDust(ctx);
   for (let pi = 0; pi < S.players.length; pi++)
     _drawCar(ctx, S.players[pi].car, S.players[pi].color, S.players[pi].isAI,
              _playerDrawPose(S.players[pi], alpha));
+  ctx.restore();
 
-  // Score HUD, Code Bullet layout: this player's score top-left, opponent top-right.
-  _hudText(ctx, `${ownName} — Score ${scoreOf(ownP)}`, 24, 48, "left",  ownColor.outline);
-  _drawDistanceUnder(ctx, curScoreOf(ownP), 24, 48, "left", ownColor.outline);
-  _hudText(ctx, `${oppName} — Score ${scoreOf(oppP)}`, viewWidth - 24, 48, "right", oppColor.outline);
-  _drawDistanceUnder(ctx, curScoreOf(oppP), viewWidth - 24, 48, "right", oppColor.outline);
-  // Center readout cheats for THIS player's car — top-center at y=48, identical to
-  // every other mode.
-  drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 48);
+  _progressFor(ctx, viewWidth / 2, [ownP, oppP]);
+  const bottom = drawPlayerPanel(ctx, 16, 14, _panelFor(ownP, ownName, ownColor));
+  drawPlayerPanel(ctx, viewWidth - 16 - PANEL_W, 14, { ..._panelFor(oppP, oppName, oppColor), lines: [] });
+  _taintTag(ctx, 16, bottom + 8);
+  drawCheatHUD(ctx, cheatTargetFromCar(ownP.car), viewWidth / 2, 74);
 
-  // A player who crossed the finish (beatTick) shows BEAT THE GAME — even after they
-  // fly off into the void and die, that's still a win, so beatTick wins over dead.
-  if (ownP.beatTick || ownP.dead) {
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, viewWidth, CANVAS_HEIGHT);
-    ctx.textAlign = "center";
-    if (ownP.beatTick) {
-      ctx.fillStyle = "#7fffa0";
-      ctx.font = "36px monospace";
-      ctx.fillText("BEAT THE GAME", viewWidth / 2, CANVAS_HEIGHT / 2);
-    } else {
-      ctx.fillStyle = "#fff";
-      ctx.font = "36px monospace";
-      ctx.fillText("DEAD", viewWidth / 2, CANVAS_HEIGHT / 2);
+  // A player who crossed the finish (beatTick) shows FINISHED — even after they fly off
+  // into the void and die, that's still a win, so beatTick wins over dead.
+  if (!bothDead) {
+    const a = _endFade(ownP.beatTick ? ownP._fxBeatAt : ownP._fxDeadAt, now);
+    if (a > 0) {
+      ctx.fillStyle = `rgba(6,10,20,${(0.35 * a).toFixed(3)})`;
+      ctx.fillRect(0, 0, viewWidth, CANVAS_HEIGHT);
+      drawEndCard(ctx, viewWidth / 2, CANVAS_HEIGHT / 2 + 20, {
+        title: ownP.beatTick ? "FINISHED!" : "CRASHED!", color: ownP.beatTick ? "#7dffa6" : "#ff8a80",
+        subtitle: "Waiting for the other player…", width: 420, alpha: a,
+        rows: [["Score", String(scoreOf(ownP))], ["Time", ownP.beatTick ? fmtTime(runSeconds(ownP)) : "DNF"]],
+      });
     }
   }
   ctx.restore();
 }
 
-function renderSplit(ctx, alpha) {
+function renderSplit(ctx, alpha, now) {
   const W = CANVAS_WIDTH;   // each half is one full standard-width screen
   const pL = S.players[0], pR = S.players[1];
+  const bothDead = pL.dead && pR.dead;
   // Left screen shows P1 (own, top-left) vs P2 (opp, top-right); right screen mirrors it.
-  _drawViewport(ctx, S.camL, 0, W, pL, pR, "P1 · WASD",   "P2 · Arrows", HUMAN_L_COLOR, HUMAN_R_COLOR, alpha);
-  _drawViewport(ctx, S.camR, W, W, pR, pL, "P2 · Arrows", "P1 · WASD",   HUMAN_R_COLOR, HUMAN_L_COLOR, alpha);
+  _drawViewport(ctx, S.camL, 0, W, pL, pR, "P1 · WASD",   "P2 · Arrows", HUMAN_L_COLOR, HUMAN_R_COLOR, alpha, now, bothDead);
+  _drawViewport(ctx, S.camR, W, W, pR, pL, "P2 · Arrows", "P1 · WASD",   HUMAN_R_COLOR, HUMAN_L_COLOR, alpha, now, bothDead);
 
   // Divider between the two screens.
   ctx.save();
-  ctx.strokeStyle = "#111"; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W, CANVAS_HEIGHT); ctx.stroke();
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(W - 3, 0, 6, CANVAS_HEIGHT);
   ctx.restore();
 
   // Only reveal the conclusion once BOTH players are DEAD (fell off, hit their head, or
-  // flew off the end after beating the game). beatTick records WHO beat the game first;
-  // the winner is whoever crossed first; if neither beat it, the higher score wins.
-  const someoneBeat = pL.beatTick || pR.beatTick;
-  const bothDead = pL.dead && pR.dead;
-  if (bothDead) {
-    let msg, sub;
-    if (someoneBeat) {
-      // Smaller beatTick = crossed the finish first; equal tick → further past it.
-      let lWins;
-      if (pL.beatTick && pR.beatTick) {
-        lWins = (pL.beatTick !== pR.beatTick) ? (pL.beatTick < pR.beatTick)
-                                              : (pL.maxDistPx >= pR.maxDistPx);
-      } else {
-        lWins = !!pL.beatTick;
-      }
-      msg = lWins ? "◀ P1 (WASD) BEAT THE GAME FIRST" : "P2 (Arrows) BEAT THE GAME FIRST ▶";
-      sub = (pL.beatTick && pR.beatTick) ? "both beat the game — first to the finish wins"
-                                         : "beat the game — opponent didn't finish";
-    } else {
-      const ls = scoreOf(pL), rs = scoreOf(pR);
-      msg = (ls === rs) ? "TIE!" : (ls > rs ? "◀ P1 (WASD) WINS" : "P2 (Arrows) WINS ▶");
-      sub = `neither beat the game — P1 score ${ls} vs P2 score ${rs}`;
-    }
-    const stageW = stageWidth();
-    ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(0, 8, stageW, 104);
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffd27f"; ctx.font = "bold 44px monospace";
-    ctx.fillText(msg, stageW / 2, 60);
-    ctx.fillStyle = "#fff"; ctx.font = "20px monospace";
-    ctx.fillText(`${sub}   —   ↺ Restart (rematch) or 🎲 Regenerate`, stageW / 2, 94);
-    ctx.restore();
+  // flew off the end after beating the game). The winner is whoever crossed the finish
+  // first; if neither did, the higher score wins.
+  if (!bothDead) { _recCache = null; return; }
+  const a = _endFade(Math.max(pL._fxDeadAt || 0, pR._fxDeadAt || 0), now);
+  if (a <= 0) return;
+  let title, sub;
+  if (pL.beatTick || pR.beatTick) {
+    let lWins;
+    if (pL.beatTick && pR.beatTick) {
+      lWins = (pL.beatTick !== pR.beatTick) ? (pL.beatTick < pR.beatTick) : (pL.maxDistPx >= pR.maxDistPx);
+    } else lWins = !!pL.beatTick;
+    title = lWins ? "◀ P1 WINS" : "P2 WINS ▶";
+    sub = (pL.beatTick && pR.beatTick) ? "Both finished — first to the flag wins" : "Reached the finish — opponent didn't";
+  } else {
+    const ls = scoreOf(pL), rs = scoreOf(pR);
+    title = (ls === rs) ? "TIE!" : (ls > rs ? "◀ P1 WINS" : "P2 WINS ▶");
+    sub = "Nobody finished — farthest run wins";
   }
+  const stageW = stageWidth();
+  ctx.fillStyle = `rgba(6,10,20,${(0.4 * a).toFixed(3)})`;
+  ctx.fillRect(0, 0, stageW, CANVAS_HEIGHT);
+  drawEndCard(ctx, stageW / 2, CANVAS_HEIGHT / 2 + 20, {
+    title, color: "#ffd27f", subtitle: S.runTainted ? "Cheats were on — not recorded" : sub, width: 600, alpha: a,
+    rows: [["P1 · WASD  (score · time)", _runLine(pL), _scoreBadge(pL) || _timeBadge(pL)],
+           ["P2 · Arrows  (score · time)", _runLine(pR), _scoreBadge(pR) || _timeBadge(pR)],
+           ..._recRows()],
+    hint: [["R", "Rematch"], ["T", "New map"]],
+  });
 }
 
+// DOM bits that change per step: the "Replaying run…" chip while a ghost plays.
 export function updateStats() {
-  // Show "Replaying run…" next to the backtrack button ONLY while a ghost replay is
-  // actively playing (not once finished, not in live modes).
   const repEl = document.getElementById("backtrack_replaying");
-  if (repEl) repEl.style.display = (S.ghostPoses && !S.ghostDone) ? "inline" : "none";
-  // Ghost replay: no live players — show the recorded run's live score instead.
-  if (S.ghostPoses && S.ghostPoses.length) {
-    const gp = S.ghostPoses[Math.max(0, Math.min(S.ghostIdx, S.ghostPoses.length - 1))];
-    const distPx = Math.round(gp.chassis.x * SCALE - SPAWN_X);
-    const hud = document.getElementById("hud_ai");
-    hud.style.display = "inline";
-    document.getElementById("dist_ai").textContent = distPx;
-    document.getElementById("hud_hum").style.display = "none";
-    document.getElementById("tick").textContent =
-      `${Math.max(0, S.ghostIdx + 1)}/${S.ghostPoses.length}`;
-    return;
-  }
-  // Human-vs-Human draws its per-side score on the canvas (see _drawViewport), so hide
-  // the single-line DOM HUD to avoid showing only one of the two.
-  if (modeDef(S.mode).split) {
-    document.getElementById("hud_ai").style.display = "none";
-    document.getElementById("hud_hum").style.display = "none";
-    document.getElementById("tick").textContent = S.tickCount;
-    return;
-  }
-  // Find AI + human players in the current array (either may be absent).
-  let ai = null, hum = null;
-  for (let pi = 0; pi < S.players.length; pi++) {
-    if (S.players[pi].isAI) ai = S.players[pi]; else hum = S.players[pi];
-  }
-  function fill(prefix, p, hudId) {
-    const hud = document.getElementById(hudId);
-    if (p === null) { hud.style.display = "none"; return; }
-    hud.style.display = "inline";
-    const distPx = Math.round(p.maxDistPx - SPAWN_X);
-    document.getElementById(`dist_${prefix}`).textContent = distPx;
-  }
-  fill("ai", ai, "hud_ai");
-  fill("hum", hum, "hud_hum");
-  document.getElementById("tick").textContent = S.tickCount;
+  if (repEl) repEl.style.display = (S.ghostPoses && !S.ghostDone) ? "inline-flex" : "none";
 }

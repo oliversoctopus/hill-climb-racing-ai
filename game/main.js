@@ -13,6 +13,8 @@ import { buildSimulation, buildWithGround, currentGroundSource, runOneStep,
 import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerrain,
          findSavedByName, findSavedByGeometry } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
+import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, deleteRecordMap,
+         fmtTime } from "./records.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
@@ -55,22 +57,28 @@ async function loadAssets() {
 }
 
 function _setupHiDPI() {
-  // On HiDPI displays devicePixelRatio > 1. Bump the backing store and scale the
-  // context so 1 canvas-unit = 1 CSS-pixel (crisp, not upscaled). Width tracks the
-  // mode (hvh = 2× for split screen); re-run this whenever the mode changes.
+  // Fit the stage to the window (as big as fits without pushing the toolbar off-screen),
+  // with the backing store at device resolution so it stays crisp at any size. The
+  // drawing code always works in logical 1280×720 units (2560 wide for split screen);
+  // the context transform maps those onto however many real pixels we have.
   const canvas = document.getElementById("stage");
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  const w = stageWidth();
-  canvas.width  = w * dpr;
-  canvas.height = CANVAS_HEIGHT * dpr;
-  // Cap the DISPLAY size at the logical (CSS-px) resolution; CSS max-width:100% +
-  // height:auto shrink it to fit narrower viewports without distortion; margin:auto
-  // centers it. Set only the width so height:auto keeps aspect.
-  canvas.style.width  = `${w}px`;
-  canvas.style.removeProperty("height");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = stageWidth(), h = CANVAS_HEIGHT;
+  const availW = document.documentElement.clientWidth - 32;
+  const availH = Math.max(360, window.innerHeight - 190);
+  const cssW = Math.floor(Math.min(availW, availH * w / h));
+  const cssH = Math.round(cssW * h / w);
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.width  = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  const k = canvas.width / w;
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  ctx.imageSmoothingQuality = "high";
+  document.documentElement.style.setProperty("--stage-w", `${Math.max(cssW, 960)}px`);
 }
+window.addEventListener("resize", () => _setupHiDPI());
 // Exported so the backtrack search can shrink the 2×-wide split canvas back to 1×.
 export { _setupHiDPI };
 
@@ -102,6 +110,7 @@ async function loop() {
   // in between (see render.js). Skip while the Best-of-X / backtrack search owns the
   // world — its headless loop bypasses the pose snapshots.
   if (!S.bestofxBusy) render();
+  syncModeTabs();
   if (didStep || S.paused) updateStats();   // the DOM stats only change on a step
   requestAnimationFrame(loop);
 }
@@ -134,6 +143,36 @@ async function init() {
 }
 
 // ---- DOM wiring ----------------------------------------------------------
+// Mode tabs: a face for the hidden #mode <select>, which stays the source of truth
+// (Alt+1…5 and the search code drive it). Synced every frame — cheap, and it catches
+// every path that changes or disables the select.
+const _modeTabs = Array.from(document.querySelectorAll("#mode_tabs button"));
+_modeTabs.forEach(b => {
+  b.onclick = () => {
+    const sel = document.getElementById("mode");
+    if (sel.disabled || sel.value === b.dataset.mode) return;
+    sel.value = b.dataset.mode;
+    sel.dispatchEvent(new Event("change"));
+  };
+});
+let _tabState = "";
+function syncModeTabs() {
+  const sel = document.getElementById("mode");
+  const st = `${sel.value}|${sel.disabled}`;
+  if (st === _tabState) return;
+  _tabState = st;
+  for (const b of _modeTabs) { b.classList.toggle("active", b.dataset.mode === sel.value); b.disabled = sel.disabled; }
+}
+document.getElementById("mode").addEventListener("change", syncModeTabs);
+syncModeTabs();
+
+// Tools drawer (readouts, cheats, debug).
+export function setDrawer(open) { document.getElementById("drawer").classList.toggle("open", open); }
+document.getElementById("drawer_btn").onclick = () => {
+  setDrawer(!document.getElementById("drawer").classList.contains("open"));
+};
+document.getElementById("drawer_close").onclick = () => { setDrawer(false); };
+
 // Top controls
 document.getElementById("reset_pos").onclick = () => {
   // "Restart (same terrain)" — put the car(s) back at the start of THIS map. No new
@@ -168,7 +207,8 @@ function loadTerrainObject(t) {
     document.getElementById("bestofx_results").style.display = "none";
     document.getElementById("bestofx_status").textContent = "";
   }
-  S.loadedTrack = { vertices: t.vertices, spawning_y: t.spawning_y, name: t.name };
+  S.loadedTrack = t.source ? { source: t.source, spawning_y: t.spawning_y, name: t.name }
+                           : { vertices: t.vertices, spawning_y: t.spawning_y, name: t.name };
   S.currentTerrainName = t.name;
   S.currentTerrainUnsaved = false;   // it exists (just loaded from a menu)
   setStatus(`Loaded ${t.name} — ${modeLabel()}`);
@@ -180,7 +220,65 @@ function loadTerrainObject(t) {
 function closeTerrainMenus() {
   document.getElementById("terrains_panel").style.display = "none";
   document.getElementById("saved_panel").style.display = "none";
+  document.getElementById("records_panel").style.display = "none";
 }
+// Records menu: every map holding a record, with Load (exact stored terrain) and Delete.
+function renderRecordsMenu() {
+  const list = document.getElementById("records_list");
+  const maps = listRecordMaps();
+  list.innerHTML = "";
+  if (!maps.length) {
+    list.innerHTML = '<div class="menu-empty">No records yet. Drive a map (no cheats) and your best score and fastest finish land here.</div>';
+    return;
+  }
+  for (const r of maps) {
+    const row = document.createElement("div");
+    row.className = "terrain-row rec-row";
+    const id = document.createElement("span");
+    id.className = "rec-id"; id.textContent = `#${r.id}`;
+    const nm = document.createElement("span");
+    nm.className = "terrain-name";
+    nm.textContent = r.label + (r.key === S.mapKey ? "  (current)" : "");
+    const tr = document.createElement("span");
+    tr.className = "trophy";
+    tr.textContent = (r.globalScore || r.globalTime) ? "🏆" : "";
+    tr.title = [r.globalScore && "best score on any map", r.globalTime && "fastest finish on any map"].filter(Boolean).join(" · ");
+    const sc = document.createElement("span");
+    sc.className = "rec-stat"; sc.textContent = r.bestScore || "—"; sc.title = "best score";
+    const tm = document.createElement("span");
+    tm.className = "rec-stat time"; tm.textContent = fmtTime(r.bestTime); tm.title = "fastest finish";
+    const load = document.createElement("button");
+    load.textContent = "Load";
+    load.dataset.recLoad = r.key;
+    if (!r.loadable) { load.disabled = true; load.title = "This map's terrain wasn't stored (older record, or storage was full)"; }
+    const del = document.createElement("button");
+    del.textContent = "Delete"; del.className = "danger";
+    del.dataset.recDel = r.key;
+    row.append(id, nm, tr, sc, tm, load, del);
+    list.appendChild(row);
+  }
+}
+function openRecordsMenu() {
+  renderRecordsMenu();
+  document.getElementById("records_panel").style.display = "block";
+}
+document.getElementById("records_btn").onclick = openRecordsMenu;
+document.getElementById("records_title_btn").onclick = openRecordsMenu;
+document.getElementById("records_close").onclick = () => { document.getElementById("records_panel").style.display = "none"; focusGame(); };
+document.getElementById("records_list").onclick = (e) => {
+  const el = e.target;
+  if (!el || !el.dataset) return;
+  if (el.dataset.recLoad !== undefined) {
+    const src = recordMapSource(el.dataset.recLoad);
+    if (!src) { setStatus("That map's terrain wasn't stored, so it can't be loaded."); return; }
+    loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(el.dataset.recLoad) });
+  } else if (el.dataset.recDel !== undefined) {
+    const label = recordMapLabel(el.dataset.recDel);
+    if (!window.confirm(`Delete your records on “${label}”? This can't be undone.`)) return;
+    deleteRecordMap(el.dataset.recDel);
+    renderRecordsMenu();
+  }
+};
 // Render the Saved Terrains list from localStorage: one row per map with Load + Delete.
 function renderSavedTerrainsMenu() {
   const list = document.getElementById("saved_list");
@@ -254,6 +352,7 @@ document.getElementById("saved_list").onclick = (e) => {
       return;
     }
     renameSavedTerrain(i, newName);
+    refreshRecordsStrip();   // record labels use the live Saved name
     // If the renamed map is the one we're currently driving, rename the current box too.
     if (S.currentTerrainName === oldName) { S.currentTerrainName = newName; updateCurrentTerrainBox(); }
     renderSavedTerrainsMenu();
@@ -264,6 +363,7 @@ document.getElementById("saved_list").onclick = (e) => {
     if (i >= 0 && i < saved.length && window.confirm(`Delete saved terrain “${saved[i].name}”?`)) {
       const deletedName = saved[i].name;
       removeSavedTerrain(i);
+      refreshRecordsStrip();
       // If we're currently driving the map we just deleted, keep it loaded but mark the
       // box "(unsaved)". The name stays so a re-save prefills it.
       if (S.currentTerrainName === deletedName) { S.currentTerrainUnsaved = true; updateCurrentTerrainBox(); }
@@ -297,6 +397,7 @@ document.getElementById("save_current_btn").onclick = () => {
   }
   terrain.name = name;
   if (!addSavedTerrain(terrain)) { setStatus("Couldn't save — browser storage is full or disabled."); return; }
+  refreshRecordsStrip();
   S.currentTerrainName = name;
   S.currentTerrainUnsaved = false;
   updateCurrentTerrainBox();

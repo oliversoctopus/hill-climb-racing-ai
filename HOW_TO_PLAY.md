@@ -22,19 +22,19 @@ Leave that window open. (Any static file server works.)
 Go to **http://localhost:8765/** in your browser (or the deployed URL).
 
 Wait for the status line to change from "Loading model + physics..." to
-**"Ready — ..."**. The sim starts immediately in *AI only* mode.
+**"Ready — ..."**. The sim starts immediately in *AI drives* mode.
 
 ## 3. Pick a mode
 
-Use the **Mode** dropdown under the canvas:
+Use the **mode tabs** in the top bar (or **Alt+1…5**):
 
 | Mode | What it does |
 |---|---|
-| **AI only** | Watch the deployed model (`ai_policy.onnx`) drive. |
-| **Human only** | You drive. No AI car. |
-| **Human vs AI** | Both cars spawn on the same terrain and race. You are the **orange** car, the AI is **blue**. |
-| **Human vs Human (split)** | Two humans race on the **same** terrain. The canvas widens to **two full screens side-by-side** (best on a large monitor). **Left screen** = **P1**, **orange** car, **WASD**. **Right screen** = **P2**, **green** car, **arrow keys**. Each screen follows its own car and shows both scores — yours top-left, your opponent's top-right — so you can spot who's ahead. When both cars are dead the **higher score wins**. |
-| **Best of X (AI)** | Runs the AI X times on one shared map (with tiny spawn jitter so attempts diverge), then lets you replay any attempt ranked best→worst. |
+| **AI drives** | Watch the deployed model (`ai_policy.onnx`) drive. |
+| **You drive** | You drive. No AI car. |
+| **You vs AI** | Both cars spawn on the same terrain and race. You are the **orange** car, the AI is **blue**. |
+| **2 players** | Two humans race on the **same** terrain, split screen. **Left screen** = **P1**, **orange** car, **WASD**. **Right screen** = **P2**, **green** car, **arrow keys**. Each screen follows its own car and shows both panels — yours top-left, your opponent's top-right. When both cars are dead, whoever reached the finish first wins; if nobody did, the farther run wins. |
+| **Best of X** | Runs the AI X times on one shared map (with tiny spawn jitter so attempts diverge), then lets you replay any attempt ranked best→worst. |
 
 Switching modes rebuilds the world with fresh terrain.
 
@@ -51,12 +51,43 @@ Both sets drive on either axis, so the two are exact mirrors of each other.
 That's the entire action space — it's on/off only, exactly what the AI has.
 No brakes, no throttle scaling.
 
-Other buttons:
+### The HUD
 
-- **↺ Restart (same terrain)** — puts the car(s) back at the start of the
-  *current* map, no new terrain. This is what you click after the "DEAD — click
-  Reset" overlay if you want another go at the same hills.
-- **🎲 Regenerate terrain** — throws away the current map and generates a
+Each car gets a panel in the top corner: its **score**, a **⏱ run timer**
+(game time, so it's fair at any sim speed — it freezes at the finish or when you
+crash), and for your car the best on this map. The bar at top-center shows how far
+along the track each car is, a gold tick at your best on this map, and the
+checkered finish. On the track itself, a **checkered FINISH flag** marks the launch
+lip (reaching it = beating the map) and a gold **BEST** pennant marks where your
+best run on this map ended. When the run is over, a card sums it up (score, finish
+time, **NEW RECORD** / **MAP BEST** badges) with **R** / **T** hints.
+
+### Records
+
+The **Your records** strip under the toolbar shows your **best score** and **fastest
+finish time** on the current map and across all maps. They're kept in this
+browser's local storage (same browser + domain only). A map is recognised by its
+shape, so a map re-loaded from History or Saved keeps its records. Each map that
+holds a record gets a permanent number in the order records were first set on maps,
+and the tiles label it with its **Saved** name if you've saved it (following renames
+and deletes), otherwise as **Record map N** — so the numbers skip past saved maps
+("Record map 1", "Hilly", "Record map 3").
+
+Every record map's terrain is stored too, so you can go back and beat it: **🏆 Records**
+in the toolbar (or click **Your records**) lists them all — number, name, best score,
+fastest finish, a 🏆 on the ones holding the all-maps bests — with **Load** (rebuilds
+the exact same map, grass and all) and **Delete** (drops that map's records; asks
+first). Each stored map takes ~16 KB of browser storage. Only human runs
+count, and a run doesn't count if you used a cheat (Invincible, Zero-G, Flight,
+Rocket, Float, Underworld, Stop, Exit, Teleport, the debug physics knobs) or
+slow-mo below 1× — the HUD shows a red **run not recorded** tag when that happens.
+Reverse controls is a handicap, so it still counts.
+
+### Toolbar
+
+- **↺ Restart** — puts the car(s) back at the start of the *current* map, no new
+  terrain.
+- **🎲 New map** — throws away the current map and generates a
   brand-new random one, respawning everyone.
 - **Pause / Resume** — freezes the sim.
 - **Speed (0.25x–8x)** — simulation speed multiplier (handy for watching the AI;
@@ -64,31 +95,35 @@ Other buttons:
   (scroll up = faster). Every speed renders at your display's full frame rate —
   the renderer fills in frames between physics ticks, while the physics itself
   always steps at the game's exact 30 Hz (slow-mo is smooth, not a slideshow).
-- **🗺 Terrains** — opens a menu of every map generated this session (newest
+- **🗺 History** — opens a menu of every map generated this session (newest
   first); click **Load** to re-drive one. Cleared when you close the page.
-- **💾 Saved Terrains** — opens a menu of maps you've saved in this browser.
-  **＋ Save Current Terrain** prompts for a name and stores the current map to
+- **💾 Saved** — opens a menu of maps you've saved in this browser.
+  **＋ Save current map** prompts for a name and stores the current map to
   the browser's local storage (survives closing/reopening and redeploys — but
   only in the same browser + domain). Names must be unique, and saving a map
   that's identical to one you already have is blocked (it tells you which saved
   terrain it matches). Each saved map has **Load**, **Rename**, and **Delete**
-  (Delete asks once to confirm). A **Current terrain: …** box under the controls
+  (Delete asks once to confirm). The **Map** chip in the toolbar
   always shows which map you're on; renaming the current map updates it, and
   deleting the saved copy of the map you're on marks it **(unsaved)** (it stays
   loaded — re-saving suggests the same name).
-- **⌨ Keybinds** — pops up the keyboard-shortcut cheat sheet.
-- **▶ Watch the AI beat the game (or get close)** — runs the Go-Explore
+- **▶ Watch the AI beat this map** — runs the Go-Explore
   save-scum backtracking search on the *current* terrain, then replays the run
   as a ghost: it flies off the end if it can, otherwise it shows the best run it
-  found. "Replaying run…" appears next to the button while the replay plays.
+  found. "● Replaying run" appears under the toolbar while the replay plays. The
+  **⚙** next to it holds the search's tick budget.
+- **⌨ Keys** (top bar) — pops up the keyboard-shortcut cheat sheet.
+- **🛠 Tools** (top bar) — slides out the drawer with the readouts, cheats, status
+  messages and debug panel (see §7). Every item also has a key, so the drawer can
+  stay closed; cheat messages pop up briefly over the canvas.
 
-Keyboard shortcuts (also on the **⌨ Keybinds** button): **I** invincible,
+Keyboard shortcuts (also on the **⌨ Keys** button): **I** invincible,
 **Z** Zero-G (toggle), **F** float the car(s) up, **U** Underworld (drop the car(s) to
 altitude 1.5 m, just above the fall-off line), **X** stop (zero all velocity), **H** altimeter, **V** velocity,
-**C** distance (current-position score), **K** reverse controls, **R** Restart (same terrain), **T** Regenerate
-terrain, **P** Pause/Resume,
-**Alt+1…5** switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best
-of X), **Esc** close the cheat sheet.
+**C** distance (current-position score), **K** reverse controls, **R** Restart (same map), **T** New
+map, **P** Pause/Resume,
+**Alt+1…5** switch mode (1 AI drives · 2 You drive · 3 You vs AI · 4 2 players · 5 Best
+of X), **Esc** close the cheat sheet / Tools drawer.
 
 ## 5. Racing the AI (Human vs AI mode)
 
@@ -98,7 +133,7 @@ of X), **Esc** close the cheat sheet.
 - Terrain is generated exactly like the real Code Bullet game (same noise, same
   steepness filter — fixed 2026-06-06), so the hills should feel identical to
   thebigcb.com.
-- The HUD shows each player's max distance and **score** (= distance px ÷ 10).
+- The HUD shows each player's **score** (= max distance px ÷ 10) and run time.
   The AI's deployed model averages ~**1370** (median ~1420) on this terrain;
   the track caps out around ~**1850–1900**.
 - You **die** when your driver's head touches the ground or you fall off the
@@ -106,8 +141,8 @@ of X), **Esc** close the cheat sheet.
   ~17 seconds (matching its training); you are never timed out.
 - The camera follows **you** while you're alive; when you die it switches to
   the AI so you can watch whether it beats your distance. When everyone is
-  dead, click **↺ Restart (same terrain)** to race the same hills again, or
-  **🎲 Regenerate terrain** for a fresh map.
+  dead, press **R** (↺ Restart) to race the same hills again, or **T** (🎲 New
+  map) for a fresh map.
 
 Tip: the AI's whole skill is rhythm — pulsing the motor on/off to keep the
 nose level on landings and to crawl up steep faces without flipping. Tapping
@@ -115,19 +150,19 @@ nose level on landings and to crawl up steep faces without flipping. Tapping
 
 ## 6. Best of X (optional)
 
-Select *Best of X (AI)*, set the number of attempts, click **Run**. The AI
+Select *Best of X*, set the number of attempts, click **Run**. The AI
 plays X attempts headless (no rendering) on one fixed map, then the results
 dropdown lets you **Watch** any attempt, ranked from best to worst. **🎲
-Regenerate terrain** re-rolls the shared map and clears old runs.
+New map** re-rolls the shared map and clears old runs.
 
-## 7. Bug probe (debug panel)
+## 7. Tools drawer: readouts, cheats, bug probe
 
-Below the main controls is an **ℹ️ Info** row (Altimeter, Velocity, Distance —
-read-only readouts, not cheats), a **✨ Cheats** row, and a **🐞 Bug probe** panel. The
+The **🛠 Tools** drawer holds **Readouts** (Altimeter, Velocity, Current distance —
+read-only, not cheats), **Cheats**, **Messages**, and a collapsed **🐞 Debug** panel. The
 **info readouts and cheats** — Altimeter, Velocity, Distance, Invincible, Zero-G + Float,
 Underworld, and the physics/motor knobs — apply to **every car on screen, the AI included, in
 all modes** (even AI-only). The **recorder / Flag / Download** tools still log the **human** car, so
-for *recording* use **Mode: Human only**. Nothing here persists or touches the
+for *recording* use **You drive** mode. Nothing here persists or touches the
 source physics — it's all runtime, so AI/browser parity and the deployed model
 are unaffected (no retrain implied).
 
@@ -155,7 +190,7 @@ are unaffected (no retrain implied).
   but a wall seals the right end. This knocks that right wall down (on the current
   map only) so you can drive out the right side; pressing it again puts the wall
   back up — the button cycles open ↔ closed (its label tracks the state). A
-  rebuild — Restart, Regenerate, loading a terrain, or switching mode — also puts
+  rebuild — Restart, New map, loading a map, or switching mode — also puts
   the wall back.
 - **Reverse controls (K):** mirrors every movement key — **←**/**→**, **↑**/**↓**,
   **A**/**D** and **S**/**W** swap while driving, and in **Flight**/**Rocket** mode forward↔back and the
@@ -175,9 +210,9 @@ are unaffected (no retrain implied).
   center-of-mass velocity, so spinning or flipping doesn't inflate it. They sit
   top-center; when both are on, altitude is on top and speed just below. In
   Human-vs-Human split mode each screen shows its own player's meters.
-- **Distance (C):** your **current-position** score, drawn just under the player's
-  score. The score is your best (high-water mark); Distance is where you are *now*,
-  so it drops if you roll backward. Shown under each player's score in every mode.
+- **Current distance (C):** your **current-position** score, shown as an extra line
+  in the player's panel. The score is your best (high-water mark); this is where you
+  are *now*, so it drops if you roll backward.
 - **⚑ Flag reproduced:** marks the current tick so the moment is easy to find.
 - **Download recording:** exports `hcr_bugrun_*.json` (ticks + flags + terrain +
   the active physics knobs) for offline analysis.

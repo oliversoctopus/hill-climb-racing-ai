@@ -12,6 +12,7 @@ import { isBelowKillLine } from "./geom.js";
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
 import { recordTick, bpApplyMotorOverride, applyFlyCheats, bpApplyPhys, bpSetZeroG,
          bpSyncExitButton } from "./cheats.js";
+import { mapKeyOf, mapRecord, globalRecord, commitRun, cheatsActive, refreshRecordsStrip } from "./records.js";
 
 // ---- Score metric --------------------------------------------------------
 // Project score: (max forward px − spawn) / 10, floored, >= 0. Matches eval.py
@@ -175,6 +176,7 @@ export function _checkPlayerEndOfStep(p) {
   const fellOffWorld = !S.bpInvincible && isBelowKillLine(ypx);   // fell below the screen into the void
   if (!S.bpInvincible && (p.car.player.kindaDead || isBelowKillLine(ypx))) p.dead = true;
   if (p.isAI && !S.bpInvincible && p.stuckCount > STUCK_TIMEOUT_TICKS) p.dead = true;
+  if (p.dead) p.deadTick = S.tickCount;   // freezes the run timer
   // Freeze ONLY on a fall-off-the-world death: head-hit ragdolls stay on-screen and
   // are fine to keep tumbling, but a car that dropped off the edge would fall forever
   // and the camera would fill the screen with brown dirt. Inert in the backtrack
@@ -229,6 +231,8 @@ function spawnPlayers(spawnDx, spawnDy) {
 // the AI spawn in pixels (Best of X only).
 export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   S.worldGen += 1;  // invalidates any in-flight runOneStep awaiting from the old world
+  // An abandoned human run (Restart/Regenerate mid-drive) still counts toward records.
+  for (const p of S.players) if (!p.isAI && !p.dead) commitRun(p, scoreOf(p));
   S.bpZeroG = false;  // fresh world has normal gravity; clear any stale float state
   S.world = new b2World(new Vec2(0, 10), false);
   S.listener = makeContactListener(S.world);
@@ -245,6 +249,12 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
     S.ground.setBodies(S.world);
     recordSessionTerrain();   // remember this fresh map for the Terrains dropdown
   }
+
+  // Records: identify the map and snapshot the bests to beat for this run.
+  S.mapKey = mapKeyOf(S.ground);
+  S.runTainted = false;
+  S.recStart = { map: mapRecord(S.mapKey), global: { ...globalRecord() } };
+  refreshRecordsStrip();
 
   S.players = spawnPlayers(spawnDx, spawnDy);
   snapRenderPoses();   // seed the render-interpolation snapshots at the spawn pose
@@ -279,7 +289,9 @@ export function buildSimulation() {
   S.replayActions = null;
   S.ghostPoses = null; S.ghostDone = false;
   if (S.loadedTrack) {
-    buildWithGround(makeSourceFromTrack(S.loadedTrack), S.loadedTrack.spawning_y, 0, 0);
+    // Record maps carry an exact meters+grass source; everything else is px vertices.
+    const src = S.loadedTrack.source || makeSourceFromTrack(S.loadedTrack);
+    buildWithGround(src, S.loadedTrack.spawning_y, 0, 0);
   } else {
     buildWithGround(null, 0);
   }
@@ -360,7 +372,7 @@ export function updateCurrentTerrainBox() {
   // "(unsaved)" flags a map whose saved copy was deleted — it's still loaded, just no
   // longer stored. Only shown when there's actually a name to qualify.
   const suffix = (S.currentTerrainUnsaved && S.currentTerrainName) ? " (unsaved)" : "";
-  box.textContent = `Current terrain: ${S.currentTerrainName || "—"}${suffix}`;
+  box.textContent = `${S.currentTerrainName || "—"}${suffix}`;
 }
 
 // ---- Actions + the per-tick step ----------------------------------------
@@ -448,11 +460,14 @@ export async function runOneStep() {
   S.tickCount += 1;
   recordTick();   // bug probe: log human-car state this tick (no-op if no human)
 
+  if (cheatsActive()) S.runTainted = true;
   let allDead = true;
   for (let pi = 0; pi < S.players.length; pi++) {
     const p = S.players[pi];
     if (p.dead) continue;
+    const hadBeat = p.beatTick;
     _checkPlayerEndOfStep(p);
+    if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p));
     if (!p.dead) allDead = false;
   }
   _recordRenderPoses();   // dead cars too — the world keeps stepping their ragdolls

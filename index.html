@@ -1,213 +1,251 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Hill Climb Racing AI</title>
-<style>
-  body { font-family: monospace; margin: 0; padding: 20px 0; background: #1e1e1e; color: #ddd; }
-  /* Backing store is full-res (set in JS); these keep the DISPLAYED canvas fit to
-     the viewport and centered so the 2× Human-vs-Human split never forces a
-     horizontal scroll on a monitor with no room to spare. */
-  #stage { background: #87ceeb; border: 1px solid #444; display: block; margin: 12px auto;
-           max-width: 100%; height: auto; box-sizing: border-box; }
-  #stage:focus { outline: none; }   /* focusable (tabindex) for keyboard driving, but no focus ring */
-  #controls { text-align: center; margin: 12px; }
-  button { font: inherit; padding: 8px 16px; background: #28a; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 0 4px; }
-  button:hover { background: #39b; }
-  button:focus { outline: none; }   /* no lingering black ring after a click (focus is handed back to the game anyway) */
-  #status { text-align: center; color: #ffa; font-size: 14px; }
-  #stats { text-align: center; font-size: 14px; margin-top: 8px; }
-  /* Shared modal look for the Terrains / Saved Terrains menus (centered popover). */
-  .hcr-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: #141414; color: #ddd; border: 1px solid #666; border-radius: 10px; padding: 18px 22px;
-    z-index: 1000; box-shadow: 0 10px 44px rgba(0,0,0,0.65); font-size: 14px; text-align: left;
-    min-width: 320px; max-width: 440px; }
-  .hcr-modal .modal-title { text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 10px; }
-  .hcr-modal .modal-footer { text-align: center; margin-top: 12px; }
-  .menu-list { max-height: 340px; overflow-y: auto; margin: 4px 0; }
-  .terrain-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; }
-  .terrain-row:nth-child(odd) { background: #1c1c1c; }
-  .terrain-row .terrain-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .terrain-row button { padding: 4px 12px; font-size: 13px; margin: 0; }
-  .terrain-row button.danger { background: #a33; }
-  .terrain-row button.danger:hover { background: #c44; }
-  .menu-empty { color: #999; padding: 14px 8px; text-align: center; line-height: 1.5; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hill Climb AI</title>
+<meta name="description" content="Drive a physics hill-climb car yourself, race a trained AI, or watch it beat the game.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2315203a'/%3E%3Cpath d='M0 48 L18 30 L30 40 L44 22 L64 42 V64 H0Z' fill='%234caf50'/%3E%3Cpath d='M0 54 L18 36 L30 46 L44 28 L64 48 V64 H0Z' fill='%236a3913'/%3E%3Ccircle cx='48' cy='14' r='6' fill='%23ffb020'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1 style="text-align:center;">Hill Climb Racing — drive it yourself, race the AI, or watch it beat the game</h1>
-<p id="status">Loading model + physics...</p>
-<canvas id="stage" width="1280" height="720" tabindex="0"></canvas>
-<div id="controls">
-  <label title="Switch modes with the keyboard: Alt+1..5 (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best of X)">Mode
-    <select id="mode">
-      <option value="ai">AI only</option>
-      <option value="human">Human only</option>
-      <option value="vs">Human vs AI</option>
-      <option value="hvh">Human vs Human (split)</option>
-      <option value="bestofx">Best of X (AI)</option>
-    </select>
-  </label>
-  <button id="reset_pos" title="Put the car(s) back at the start of THIS SAME terrain — no new map. (R)">↺ Restart (same terrain)</button>
-  <button id="reset" title="Throw away this terrain and generate a brand-new random map. (T)">🎲 Regenerate terrain</button>
-  <button id="pause" title="Pause / Resume (P)">Pause</button>
-  <label style="margin-left:12px;" title="Simulation speed (Shift+Scroll also steps this)">Speed
-    <select id="speed">
-      <option value="0.25">0.25x</option>
-      <option value="0.5">0.5x</option>
-      <option value="1" selected>1x</option>
-      <option value="2">2x</option>
-      <option value="4">4x</option>
-      <option value="8">8x</option>
-    </select>
-  </label>
-  <button id="terrains_btn" style="margin-left:12px;" title="Maps generated this session — click to re-load one">🗺 Terrains</button>
-  <button id="saved_btn" title="Terrains you've saved in this browser — save, load, or delete">💾 Saved Terrains</button>
-  <button id="keybinds_btn" title="Show keyboard shortcuts">⌨ Keybinds</button>
-</div>
-<div style="text-align:center; margin:2px 12px 0;">
-  <span id="current_terrain_box" style="display:inline-block; padding:3px 12px; border:1px solid #555;
-        border-radius:12px; background:#222; color:#9fd4ff; font-size:13px;">Current terrain: —</span>
-</div>
-<div id="keybinds_panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-     background:#111; color:#ddd; border:1px solid #666; border-radius:8px; padding:18px 26px; z-index:1000;
-     box-shadow:0 8px 40px rgba(0,0,0,0.6); font-size:15px; line-height:1.7; text-align:left;">
-  <div style="text-align:center; font-weight:bold; font-size:17px; margin-bottom:8px;">⌨ Keyboard shortcuts</div>
-  <table style="border-collapse:collapse;">
-    <tr><td style="padding-right:16px;"><b>← → ↑ ↓</b> or <b>W A S D</b></td><td>Drive — →/↑ (or D/W) forward, ←/↓ (or A/S) reverse (either set works in single-player)</td></tr>
-    <tr><td><b>WASD</b> / <b>Arrows</b></td><td>Human-vs-Human: left player / right player</td></tr>
-    <tr><td><b>Alt+1…5</b></td><td>Switch mode (1 AI · 2 Human · 3 Human vs AI · 4 Human vs Human · 5 Best of X)</td></tr>
-    <tr><td><b>Shift+Scroll</b></td><td>Sim speed (step through 0.25x–8x, scroll up = faster)</td></tr>
-    <tr><td><b>I</b></td><td>Toggle Invincible mode</td></tr>
-    <tr><td><b>Z</b></td><td>Zero-G (toggle off / on)</td></tr>
-    <tr><td><b>F</b></td><td>Float car up</td></tr>
-    <tr><td><b>U</b></td><td>Underworld (drop car to altitude 1.5 m, just above the fall-off line)</td></tr>
-    <tr><td><b>X</b></td><td>Stop (momentarily zero all car velocity — horizontal, vertical, rotational)</td></tr>
-    <tr><td><b>E</b></td><td>Open/Close Exit (toggle the underworld's right wall — knock it down to drive out, press again to seal it)</td></tr>
-    <tr><td><b>H</b></td><td>Altimeter (toggle altitude readout)</td></tr>
-    <tr><td><b>V</b></td><td>Velocity (toggle speed readout)</td></tr>
-    <tr><td><b>C</b></td><td>Distance (toggle current-position score, under the player's score)</td></tr>
-    <tr><td><b>G</b></td><td>Flight mode: WASD/arrows fly at a constant speed — ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed (0–300, steps of 5 to 100 then 10); release fwd/back to stop dead</td></tr>
-    <tr><td><b>J</b></td><td>Rocket mode: WASD/arrows thrust — ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
-    <tr><td><b>K</b></td><td>Reverse controls: every movement key is mirrored — left↔right while driving, forward↔back and the two rotate keys in Flight/Rocket mode</td></tr>
-    <tr><td><b>R</b></td><td>Restart (same terrain)</td></tr>
-    <tr><td><b>T</b></td><td>Regenerate terrain</td></tr>
-    <tr><td><b>P</b></td><td>Pause / Resume</td></tr>
-  </table>
-  <div style="text-align:center; margin-top:12px;">
-    <button id="keybinds_close">Close (Esc)</button>
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#15203a"/><path d="M0 48 L18 30 L30 40 L44 22 L64 42 V64 H0Z" fill="#4caf50"/><path d="M0 54 L18 36 L30 46 L44 28 L64 48 V64 H0Z" fill="#6a3913"/><circle cx="48" cy="14" r="6" fill="#ffb020"/></svg>
+    <span class="brand-name">Hill Climb <em>AI</em></span>
   </div>
+  <!-- The mode tabs drive the hidden #mode select, which stays the single source of the
+       current mode (Alt+1…5 and the search code read/write it). Order matches Alt+N. -->
+  <nav class="modes" id="mode_tabs" aria-label="Game mode">
+    <button data-mode="ai" title="Watch the AI drive (Alt+1)">AI drives</button>
+    <button data-mode="human" title="Drive it yourself (Alt+2)">You drive</button>
+    <button data-mode="vs" title="Race the AI on the same map (Alt+3)">You vs AI</button>
+    <button data-mode="hvh" title="Two players, split screen: WASD vs arrows (Alt+4)">2 players</button>
+    <button data-mode="bestofx" title="Run the AI X times and keep the best (Alt+5)">Best of X</button>
+  </nav>
+  <select id="mode" aria-hidden="true" tabindex="-1">
+    <option value="ai">AI only</option>
+    <option value="human">Human only</option>
+    <option value="vs">Human vs AI</option>
+    <option value="hvh">Human vs Human (split)</option>
+    <option value="bestofx">Best of X (AI)</option>
+  </select>
+  <div class="topbar-right">
+    <button id="keybinds_btn" class="ghost" title="Keyboard shortcuts">⌨ Keys</button>
+    <button id="drawer_btn" class="ghost" title="Readouts, cheats and debug tools">🛠 Tools</button>
+  </div>
+</header>
+
+<main class="main">
+  <div class="stage-frame">
+    <canvas id="stage" width="1280" height="720" tabindex="0"></canvas>
+    <div id="toast" role="status"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="group">
+      <button id="reset_pos" title="Put the car(s) back at the start of this same map (R)">↺ Restart <kbd>R</kbd></button>
+      <button id="reset" title="Generate a brand-new random map (T)">🎲 New map <kbd>T</kbd></button>
+      <button id="pause" title="Pause / Resume (P)">Pause</button>
+    </div>
+    <div class="sep"></div>
+    <label class="group label" title="Simulation speed (Shift+Scroll also steps this). Slow-mo runs aren't recorded.">Speed
+      <select id="speed">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+        <option value="8">8×</option>
+      </select>
+    </label>
+    <div class="sep"></div>
+    <div class="group">
+      <span class="chip" title="The map you're on"><span class="lbl">Map</span><span id="current_terrain_box">—</span></span>
+      <button id="terrains_btn" class="ghost" title="Maps generated this session — click to re-load one">🗺 History</button>
+      <button id="saved_btn" class="ghost" title="Maps you've saved in this browser — save, load, or delete">💾 Saved</button>
+      <button id="records_btn" class="ghost" title="Every map you hold a record on — load one to beat it">🏆 Records</button>
+    </div>
+    <div class="group cta">
+      <button id="backtrack_run" class="primary" title="Run the rewind-and-retry search on THIS map, then replay it — it flies off the end if it can, otherwise it shows the best run it managed.">▶ Watch the AI beat this map</button>
+      <button id="backtrack_abort" class="danger" style="display:none;">Abort</button>
+      <details class="pop">
+        <summary title="Search settings">⚙</summary>
+        <div class="pop-body">
+          <label>Tick budget
+            <input id="backtrack_budget" type="number" value="120000" min="5000" step="10000" title="Max physics ticks before giving up (hard maps need more)">
+          </label>
+          The search gives up after this many physics ticks. Raise it if the AI keeps
+          running out on a hard map.
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div id="bestofx_panel" style="display:none;">
+    <div class="row">
+      <label class="label">Max attempts (X)
+        <input id="bestofx_n" type="number" value="15" min="1" max="200" title="Stops early once a map is solved (an attempt reaches the finish). More attempts solve more maps, with diminishing returns."></label>
+      <button id="bestofx_run" class="primary">Run</button>
+      <button id="bestofx_abort" class="danger" style="display:none;">Abort</button>
+      <span id="bestofx_status"></span>
+      <span id="bestofx_results" style="display:none;">
+        <label class="label">Pick run
+          <select id="bestofx_select"></select>
+        </label>
+        <button id="bestofx_watch">Watch</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="subbar">
+    <span id="status">Loading model + physics…</span>
+    <span id="backtrack_replaying" class="pill" style="display:none;">● Replaying run</span>
+    <span id="backtrack_status"></span>
+  </div>
+
+  <section class="records" aria-label="Your records">
+    <button class="records-title" id="records_title_btn" title="Open the Records menu">Your records<small>human runs, no cheats · view all ›</small></button>
+    <div class="rec" id="rec_map_score"><div class="rec-val">—</div><div class="rec-sub">best score · this map</div></div>
+    <div class="rec time" id="rec_map_time"><div class="rec-val">—</div><div class="rec-sub">fastest finish · this map</div></div>
+    <div class="rec" id="rec_all_score"><div class="rec-val">—</div><div class="rec-sub">best score · all maps</div></div>
+    <div class="rec time" id="rec_all_time"><div class="rec-val">—</div><div class="rec-sub">fastest finish · all maps</div></div>
+  </section>
+
+  <div class="hint">
+    <span><kbd>→</kbd><kbd>↑</kbd> or <kbd>D</kbd><kbd>W</kbd> gas</span>
+    <span><kbd>←</kbd><kbd>↓</kbd> or <kbd>A</kbd><kbd>S</kbd> reverse</span>
+    <span>2 players: <kbd>WASD</kbd> left · <kbd>Arrows</kbd> right</span>
+    <span>Reach the <b>checkered flag</b> to beat the map</span>
+  </div>
+</main>
+
+<!-- Tools drawer: readouts, cheats, status messages, debug. Every control keeps its
+     keyboard shortcut, so it works with the drawer closed too. -->
+<aside id="drawer" class="drawer" aria-label="Tools">
+  <div class="drawer-head">
+    <h2>🛠 Tools</h2>
+    <button id="drawer_close" class="ghost" title="Close (Esc)">✕</button>
+  </div>
+
+  <h3>Readouts</h3>
+  <label class="toggle" title="Height above the fall-off line, in metres"><input type="checkbox" id="bp_altimeter"><span class="sw"></span>Altimeter<kbd>H</kbd></label>
+  <label class="toggle" title="Whole-vehicle speed in m/s"><input type="checkbox" id="bp_speed"><span class="sw"></span>Velocity<kbd>V</kbd></label>
+  <label class="toggle" title="Your current-position score (drops if you roll back)"><input type="checkbox" id="bp_distance"><span class="sw"></span>Current distance<kbd>C</kbd></label>
+
+  <h3>Cheats</h3>
+  <label class="toggle" title="Head hits / falling off / AI timeout won't kill"><input type="checkbox" id="bp_invince"><span class="sw"></span>Invincible<kbd>I</kbd></label>
+  <label class="toggle" title="Gravity off — everything keeps its velocity"><input type="checkbox" id="bp_zerog"><span class="sw"></span>Zero-G<kbd>Z</kbd></label>
+  <label class="toggle" title="WASD/arrows fly at constant speed; scroll = speed"><input type="checkbox" id="bp_flight"><span class="sw"></span>Flight<kbd>G</kbd></label>
+  <label class="toggle" title="WASD/arrows thrust like a rocket; scroll = thrust"><input type="checkbox" id="bp_rocket"><span class="sw"></span>Rocket<kbd>J</kbd></label>
+  <label class="toggle" title="Mirror every movement key (a handicap — still counts for records)"><input type="checkbox" id="bp_reverse"><span class="sw"></span>Reverse controls<kbd>K</kbd></label>
+  <div class="btn-grid" style="margin-top:8px;">
+    <button id="bp_float" title="Lift every car ~300px, keeping velocity (F)">Float <kbd>F</kbd></button>
+    <button id="bp_stop" title="Zero all velocity on every car (X)">Stop <kbd>X</kbd></button>
+    <button id="bp_underworld" title="Drop every car to 1.5 m above the fall-off line (U)">Underworld <kbd>U</kbd></button>
+    <button id="bp_openexit" title="Toggle the underworld's right wall (E)">Open Exit</button>
+    <button id="bp_teleport" title="Teleport the car(s): X = score, Y = altitude">Teleport…</button>
+  </div>
+  <p class="note">Any cheat (and slow-mo below 1×) pauses record-keeping for that run. Reverse controls still counts.</p>
+
+  <h3>Messages</h3>
+  <span id="bp_status"></span>
+
+  <details id="advanced_panel">
+    <summary>🐞 Debug — bug probe &amp; physics knobs</summary>
+    <div class="dbg">
+      Bug probe <span>(use <b>You drive</b>)</span>:<br>
+      <button id="bp_flag" style="background:#a63;">⚑ Flag reproduced</button>
+      <button id="bp_download">Download recording</button><br>
+      <span id="bp_live"></span>
+    </div>
+    <div class="dbg">
+      Physics knobs (all cars, incl. the AI):<br>
+      chassis angDamp <input id="bp_chassisdamp" type="number" step="0.05" value="0.1"><br>
+      wheel angDamp <input id="bp_wheeldamp" type="number" step="0.1" value="1.8"><br>
+      susp freq <input id="bp_suspfreq" type="number" step="5" value="70">
+      susp damp <input id="bp_suspdamp" type="number" step="1" value="25"><br>
+      <button id="bp_applyphys">Apply</button>
+      <button id="bp_unmask" class="danger">🔥 Unmask</button>
+      <button id="bp_resetphys">Reset</button>
+    </div>
+    <div class="dbg">
+      Motor &amp; friction (motor SPEED is the spin lever):<br>
+      motor speed × <input id="bp_motorspeed" type="number" step="0.5" value="1">
+      torque × <input id="bp_motortorque" type="number" step="0.5" value="1"><br>
+      wheel friction <input id="bp_wheelfric" type="number" step="0.1" value="1.5">
+      <button id="bp_motorspin" class="danger">🌀 Motor-spin</button>
+    </div>
+  </details>
+</aside>
+
+<div id="keybinds_panel" class="hcr-modal" style="display:none;">
+  <div class="modal-title">⌨ Keyboard shortcuts</div>
+  <table class="keys">
+    <tr class="sec"><td colspan="2">Driving</td></tr>
+    <tr><td><kbd>→</kbd> <kbd>↑</kbd> / <kbd>D</kbd> <kbd>W</kbd></td><td>Gas (forward)</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>↓</kbd> / <kbd>A</kbd> <kbd>S</kbd></td><td>Reverse — either set works in single-player</td></tr>
+    <tr><td><kbd>WASD</kbd> / <kbd>Arrows</kbd></td><td>2 players: left player / right player</td></tr>
+    <tr class="sec"><td colspan="2">Game</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Restart (same map)</td></tr>
+    <tr><td><kbd>T</kbd></td><td>New map</td></tr>
+    <tr><td><kbd>P</kbd></td><td>Pause / Resume</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>5</kbd></td><td>Mode: AI drives · You drive · You vs AI · 2 players · Best of X</td></tr>
+    <tr><td><kbd>Shift</kbd>+Scroll</td><td>Sim speed (0.25×–8×, scroll up = faster)</td></tr>
+    <tr class="sec"><td colspan="2">Readouts</td></tr>
+    <tr><td><kbd>H</kbd></td><td>Altimeter</td></tr>
+    <tr><td><kbd>V</kbd></td><td>Velocity</td></tr>
+    <tr><td><kbd>C</kbd></td><td>Current distance (under your score)</td></tr>
+    <tr class="sec"><td colspan="2">Cheats (runs using them aren't recorded)</td></tr>
+    <tr><td><kbd>I</kbd></td><td>Invincible</td></tr>
+    <tr><td><kbd>Z</kbd></td><td>Zero-G</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Float car up</td></tr>
+    <tr><td><kbd>U</kbd></td><td>Underworld (drop to 1.5 m above the fall-off line)</td></tr>
+    <tr><td><kbd>X</kbd></td><td>Stop (zero all velocity)</td></tr>
+    <tr><td><kbd>E</kbd></td><td>Open / close the underworld exit</td></tr>
+    <tr><td><kbd>G</kbd></td><td>Flight: ↑/W fwd, ↓/S back, ←/A &amp; →/D rotate; scroll = speed</td></tr>
+    <tr><td><kbd>J</kbd></td><td>Rocket: ↑/W &amp; ↓/S thrust, ←/A &amp; →/D rotate; scroll = thrust</td></tr>
+    <tr><td><kbd>K</kbd></td><td>Reverse controls (mirrors every movement key)</td></tr>
+  </table>
+  <div class="modal-footer"><button id="keybinds_close">Close (Esc)</button></div>
 </div>
 <div id="terrains_panel" class="hcr-modal">
-  <div class="modal-title">🗺 Session Terrains</div>
-  <div style="color:#999; font-size:12px; margin-bottom:8px; line-height:1.5;">Maps generated this session (newest
-    first). These are cleared when you close the page — use <b>Save Current Terrain</b> to keep one.</div>
+  <div class="modal-title">🗺 Map history</div>
+  <div class="modal-note">Maps generated this session, newest first. They're cleared when you close
+    the page — use <b>Saved → Save current map</b> to keep one.</div>
   <div id="terrains_list" class="menu-list"></div>
   <div class="modal-footer"><button id="terrains_close">Close (Esc)</button></div>
 </div>
 <div id="saved_panel" class="hcr-modal">
-  <div class="modal-title">💾 Saved Terrains</div>
+  <div class="modal-title">💾 Saved maps</div>
   <div style="text-align:center; margin-bottom:10px;">
-    <button id="save_current_btn" style="background:#2a8;">＋ Save Current Terrain</button>
+    <button id="save_current_btn" class="primary">＋ Save current map</button>
   </div>
   <div id="saved_list" class="menu-list"></div>
   <div class="modal-footer"><button id="saved_close">Close (Esc)</button></div>
 </div>
-<div id="teleport_panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-     background:#111; color:#ddd; border:1px solid #666; border-radius:8px; padding:18px 26px; z-index:1000;
-     box-shadow:0 8px 40px rgba(0,0,0,0.6); font-size:15px; line-height:1.8; text-align:left; min-width:260px;">
-  <div style="text-align:center; font-weight:bold; font-size:17px; margin-bottom:10px;">✈ Teleport</div>
-  <div><label>X — score&nbsp;&nbsp;<input id="teleport_x" type="number" step="10" style="width:100px;"></label></div>
-  <div><label>Y — altitude (m)&nbsp;&nbsp;<input id="teleport_y" type="number" step="1" style="width:100px;"></label></div>
-  <div style="color:#999; font-size:12px; line-height:1.5; margin-top:8px; max-width:300px;">
-    X is the project <b>score</b> (distance); Y is <b>altitude</b> in metres above the fall-off line (the
-    Altimeter reading). Different units, but both match the on-screen readouts. Velocity is preserved —
-    turn on Invincible if you land somewhere risky.</div>
-  <div style="text-align:center; margin-top:14px;">
-    <button id="teleport_go" style="background:#2a8;">Teleport</button>
+<div id="records_panel" class="hcr-modal">
+  <div class="modal-title">🏆 Record maps</div>
+  <div class="modal-note">Every map you've set a record on, in the order you first set one.
+    Saved maps show their Saved name. <b>Load</b> a map to try to beat your record on it.</div>
+  <div id="records_list" class="menu-list"></div>
+  <div class="modal-footer"><button id="records_close">Close (Esc)</button></div>
+</div>
+<div id="teleport_panel" class="hcr-modal">
+  <div class="modal-title">✈ Teleport</div>
+  <div class="teleport-row"><label for="teleport_x">X — score</label><input id="teleport_x" type="number" step="10"></div>
+  <div class="teleport-row"><label for="teleport_y">Y — altitude (m)</label><input id="teleport_y" type="number" step="1"></div>
+  <div class="modal-note" style="text-align:left; max-width:320px;">
+    X is the <b>score</b> (distance); Y is <b>altitude</b> in metres above the fall-off line (the
+    Altimeter reading). Velocity is preserved — turn on Invincible if you land somewhere risky.</div>
+  <div class="modal-footer">
+    <button id="teleport_go" class="primary">Teleport</button>
     <button id="teleport_close">Cancel (Esc)</button>
   </div>
-</div>
-<div id="backtrack_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px;">
-  🧗 <button id="backtrack_run" style="background:#2a8;" title="Run the Go-Explore save-scum search on THIS terrain, then replay it — it flies off the end if it can, otherwise it shows the best run it managed.">▶ Watch the AI beat the game (or get close)</button>
-  <button id="backtrack_abort" style="display:none; background:#a33;">Abort</button>
-  <span id="backtrack_replaying" style="margin-left:10px; color:#7fffa0; font-weight:bold; display:none;">Replaying run…</span>
-  <span id="backtrack_status" style="margin-left:10px; color:#ffa;"></span>
-  <span style="color:#666; margin-left:14px;">tick budget
-    <input id="backtrack_budget" type="number" value="120000" min="5000" step="10000" style="width:80px;" title="Max physics ticks before giving up (hard tracks need more)"></span>
-</div>
-<div id="info_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px;">
-  ℹ️ Info:
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_altimeter" title="Show a live altitude readout — the car's height above a fixed level (the fall-off line at the bottom of the screen), in meters (H)"> Altimeter</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_speed" title="Show a live velocity readout — the whole-vehicle speed in m/s (V)"> Velocity</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_distance" title="Show your CURRENT-position score under the player's score — unlike the score (your best), this drops if you roll backward (C)"> Distance</label>
-</div>
-<div id="cheats_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px;">
-  ✨ Cheats:
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_invince"> Invincible</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_zerog" title="Toggle gravity off/on — everything keeps its velocity (Z)"> Zero-G</label>
-  <button id="bp_float" title="Lift every car ~300px, preserving velocity (F)">Float</button>
-  <button id="bp_underworld" title="Drop every car to altitude 1.5 m — right above the fall-off line at the bottom of the screen, preserving velocity (U)">Underworld</button>
-  <button id="bp_teleport" title="Teleport the car(s) to any position — X = score (distance), Y = altitude in metres">Teleport…</button>
-  <button id="bp_stop" title="Momentarily zero all velocity — horizontal, vertical, and rotational — on every car (X)">Stop</button>
-  <button id="bp_openexit" title="Toggle the invisible right wall of the 'underworld' (below the terrain): knock it down so you can drive out the right end, press again to put it back. Also restored on Restart/Regenerate (E)">Open Exit</button>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_flight" title="Flight mode — WASD/arrows fly at a constant speed (↑/W forward, ↓/S backward, ←/A & →/D rotate); release to stop dead in the air; scroll wheel = speed 0–300 (G)"> Flight</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_rocket" title="Rocket mode — WASD/arrows thrust the car like a rocket (↑/W & ↓/S thrust, ←/A & →/D rotate); scroll wheel = thrust (J)"> Rocket</label>
-  <label style="margin-right:8px;"><input type="checkbox" id="bp_reverse" title="Reverse controls — every movement key is mirrored: left↔right while driving, and forward↔back / rotate↔rotate in Flight and Rocket mode (K)"> Reverse controls</label>
-</div>
-<!-- Status messages get their own section (min-height reserves the line) so their
-     changing length doesn't reflow the cheat controls above. -->
-<div id="messages_panel" style="text-align:center; margin:8px; color:#ddd; border-top:1px solid #444; padding-top:6px; min-height:20px;">
-  💬 <span id="bp_status" style="color:#ffa;"></span>
-</div>
-<details id="advanced_panel" style="max-width:1100px; margin:6px auto;">
-<summary style="cursor:pointer; text-align:center; color:#999; font-size:13px; padding:6px; border-top:1px solid #444;">🐞 Debug — bug probe &amp; physics knobs <span style="color:#666;">(advanced debugging tools — click to expand)</span></summary>
-<div id="bugprobe" style="text-align:center; margin:8px; color:#ddd; padding-top:6px;">
-  🐞 Bug probe <span style="color:#888;">(use Mode: <b>Human only</b>)</span>:
-  <button id="bp_flag" style="background:#a63;">⚑ Flag reproduced</button>
-  <button id="bp_download">Download recording</button>
-  <span id="bp_live" style="margin-left:12px; color:#9f9; font-family:monospace;"></span>
-</div>
-<div id="bugprobe2" style="text-align:center; margin:4px; color:#bbb; font-size:13px;">
-  Physics knobs <span style="color:#888;">(applies to all cars, incl. the AI — lower the damping to unmask the spin)</span>:
-  chassis&nbsp;angDamp <input id="bp_chassisdamp" type="number" step="0.05" value="0.1" style="width:58px;">
-  wheel&nbsp;angDamp <input id="bp_wheeldamp" type="number" step="0.1" value="1.8" style="width:58px;">
-  susp&nbsp;freq <input id="bp_suspfreq" type="number" step="5" value="70" style="width:58px;">
-  susp&nbsp;damp <input id="bp_suspdamp" type="number" step="1" value="25" style="width:58px;">
-  <button id="bp_applyphys">Apply</button>
-  <button id="bp_unmask" style="background:#a33;">🔥 Unmask</button>
-  <button id="bp_resetphys">Reset</button>
-</div>
-<div id="bugprobe3" style="text-align:center; margin:4px; color:#bbb; font-size:13px;">
-  Motor &amp; friction <span style="color:#888;">(applies to all cars, incl. the AI — motor SPEED is the spin lever)</span>:
-  motor&nbsp;speed&nbsp;× <input id="bp_motorspeed" type="number" step="0.5" value="1" style="width:54px;">
-  motor&nbsp;torque&nbsp;× <input id="bp_motortorque" type="number" step="0.5" value="1" style="width:54px;">
-  wheel&nbsp;friction <input id="bp_wheelfric" type="number" step="0.1" value="1.5" style="width:54px;">
-  <button id="bp_motorspin" style="background:#a33;">🌀 Motor-spin</button>
-</div>
-</details>
-<div id="bestofx_panel" style="display:none; text-align:center; margin:8px; color:#ddd;">
-  <label>Max attempts (X): <input id="bestofx_n" type="number" value="15" min="1" max="200" style="width:60px;" title="Stops early once a map is solved (an attempt reaches the last vertex / true end). More attempts solve more maps, with diminishing returns as chaos caps it."></label>
-  <button id="bestofx_run">Run</button>
-  <button id="bestofx_abort" style="display:none; background:#a33;">Abort</button>
-  <span id="bestofx_status" style="margin-left:12px; color:#ffa;"></span>
-  <span id="bestofx_results" style="display:none; margin-left:12px;">
-    <label>Pick run:
-      <select id="bestofx_select" style="min-width:240px;"></select>
-    </label>
-    <button id="bestofx_watch">Watch</button>
-  </span>
-</div>
-<div id="stats" style="text-align:center;font-size:14px;margin-top:8px;">
-  <span id="hud_ai"  style="color:#5cf;">AI: dist <span id="dist_ai">0</span></span>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span id="hud_hum" style="color:#fc5;">Human: dist <span id="dist_hum">0</span></span>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  tick: <span id="tick">0</span>
-</div>
-<div style="text-align:center;color:#888;font-size:13px;margin-top:6px;">
-  Human controls: <b>←</b> reverse, <b>→</b> forward
 </div>
 
 <!-- ONNX Runtime Web first (local copy — avoid CDN race / global conflicts) -->

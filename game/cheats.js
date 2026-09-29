@@ -28,7 +28,20 @@ function _bpAllCars() {
   }
   return out;
 }
-export function bpSetStatus(s) { const e = document.getElementById("bp_status"); if (e) e.textContent = s; }
+export function bpSetStatus(s) {
+  const e = document.getElementById("bp_status"); if (e) e.textContent = s;
+  showToast(s);
+}
+// Transient message over the canvas, so cheat feedback is visible with the drawer shut.
+let _toastTimer = 0;
+export function showToast(s) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = s;
+  t.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
 
 export function recordTick() {
   const p = _bpHumanPlayer();
@@ -84,6 +97,7 @@ export function bpApplyPhys(announce) {
     }
   }
   const modified = (cad !== 0.1) || (wad !== 1.8) || (sf !== 70) || (sd !== 25) || (wf !== 1.5);
+  S.bpPhysModified = modified;
   if (announce || modified)
     bpSetStatus(`Physics: chassisDamp=${cad} wheelDamp=${wad} suspFreq=${sf} suspDamp=${sd} wheelFric=${wf}${modified ? "  (MODIFIED)" : ""}`);
 }
@@ -93,6 +107,7 @@ export function bpApplyPhys(announce) {
 export function bpApplyMotorOverride() {
   const ts = _bpNum("bp_motortorque", 1), ss = _bpNum("bp_motorspeed", 1);
   if (ts === 1 && ss === 1) return;
+  S.runTainted = true;
   const cars = _bpAllCars();
   for (let ci = 0; ci < cars.length; ci++) {
     const ws = cars[ci].wheels;
@@ -214,6 +229,7 @@ function _bpFloatOneCar(c) {
   }
 }
 export function bpFloatCar() {
+  S.runTainted = true;   // one-shot cheat → this run is off the record
   // Float every car on screen — AI and human alike (both players in Human-vs-Human).
   let n = 0;
   if (S.players) {
@@ -246,6 +262,7 @@ function _bpUnderworldOneCar(c) {
   }
 }
 export function bpUnderworld() {
+  S.runTainted = true;   // one-shot cheat → this run is off the record
   // Send every car on screen down to the underworld — AI and human alike.
   let n = 0;
   if (S.players) {
@@ -272,6 +289,7 @@ function _bpStopOneCar(c) {
   }
 }
 export function bpStop() {
+  S.runTainted = true;   // one-shot cheat → this run is off the record
   let n = 0;
   if (S.players) {
     for (let i = 0; i < S.players.length; i++) {
@@ -310,6 +328,7 @@ export function bpSyncExitButton(open) {
   if (el) el.textContent = open ? "Close Exit" : "Open Exit";
 }
 export function bpToggleExit() {
+  S.runTainted = true;   // one-shot cheat → this run is off the record
   const g = S.ground;
   if (!g || !g.vectors || g.vectors.length < 3 || !g.dirtBody) { bpSetStatus("No terrain — start a run first."); return; }
   const V = g.vectors, n = V.length;
@@ -379,6 +398,7 @@ function _bpTeleportOneCar(c, targetXm, targetYm) {
   }
 }
 export function bpTeleport(score, altitudeM) {
+  S.runTainted = true;
   const targetXm = (score * 10 + SPAWN_X) / SCALE;   // score → chassis x (meters)
   const targetYm = KILL_LINE_M - altitudeM;          // altitude → chassis y (meters, y-down)
   let n = 0;
