@@ -216,7 +216,7 @@ function _drawScenery(ctx, viewWidth, timeSec) {
     ctx.lineTo(topPts[topPts.length-1][0], bottom);
     ctx.lineTo(topPts[0][0], bottom);
     ctx.closePath();
-    fillDirt(ctx);
+    fillDirt(ctx, viewWidth);
     // Main green grass band. Width + color match Code Bullet's Ground.show():
     // stroke(0,120,0) = #007800, strokeWeight(grassThickness*2) = 10 (centered).
     ctx.lineJoin = "round";

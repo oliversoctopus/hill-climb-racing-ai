@@ -51,17 +51,6 @@ function _makeDirt() {
     g.fillStyle = rnd() < 0.5 ? "rgba(40,18,4,0.35)" : "rgba(150,90,40,0.25)";
     g.fillRect(rnd() * N, rnd() * N, 2 + rnd() * 2, 2 + rnd() * 2);
   }
-  for (let i = 0; i < 16; i++) {            // pebbles, wrapped so the tile is seamless
-    const x = rnd() * N, y = rnd() * N, rx = 4 + rnd() * 7, ry = rx * (0.55 + rnd() * 0.3);
-    for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) {
-      g.fillStyle = "#4a2609";
-      g.beginPath(); g.ellipse(x + dx + 1, y + dy + 2, rx, ry, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "#8d5a2b";
-      g.beginPath(); g.ellipse(x + dx, y + dy, rx, ry, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "rgba(255,220,170,0.25)";
-      g.beginPath(); g.ellipse(x + dx - rx * 0.3, y + dy - ry * 0.35, rx * 0.4, ry * 0.3, 0, 0, Math.PI * 2); g.fill();
-    }
-  }
   return c;
 }
 
@@ -136,18 +125,62 @@ export function drawBackground(ctx, viewWidth) {
   _drawHills(ctx, viewWidth, 0.3, 500, 80, 4.1, "#7fb38a", "#5d9a66");
 }
 
+// Integer hash of a pebble cell → 4 values in [0,1). Pebbles are placed per world
+// cell (not baked into the repeating dirt tile) so they never visibly repeat.
+function _cellRand(cx, cy) {
+  let h = Math.imul(cx, 0x27d4eb2d) ^ Math.imul(cy, 0x165667b1);
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h ^= h + Math.imul(h ^ (h >>> 7), 0x297a2d39);
+    out.push(((h ^ (h >>> 14)) >>> 0) / 4294967296);
+  }
+  return out;
+}
+
+const PEBBLE_CELL = 72;
+function _drawPebbles(ctx, viewWidth) {
+  const x0 = Math.floor((S.cameraPanX - PAD - 12) / PEBBLE_CELL);
+  const x1 = Math.floor((S.cameraPanX + viewWidth + PAD + 12) / PEBBLE_CELL);
+  const y0 = Math.floor((S.cameraPanY - PAD - 12) / PEBBLE_CELL);
+  const y1 = Math.floor((S.cameraPanY + CANVAS_HEIGHT + 60 + 12) / PEBBLE_CELL);
+  const peb = [];
+  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
+    const [a, b, c, d] = _cellRand(cx, cy);
+    if (d < 0.3) continue;
+    const rx = 3 + c * 8, ry = rx * (0.55 + d * 0.3);
+    peb.push([(cx + a) * PEBBLE_CELL - S.cameraPanX, (cy + b) * PEBBLE_CELL - S.cameraPanY, rx, ry]);
+  }
+  // One path per layer (shadow, body, highlight) keeps it to 3 fills per frame.
+  const layer = (color, dx, dy, sx, sy, ox, oy) => {
+    ctx.fillStyle = color; ctx.beginPath();
+    for (const [x, y, rx, ry] of peb) {
+      const px = x + dx + rx * ox, py = y + dy + ry * oy;
+      ctx.moveTo(px + rx * sx, py);
+      ctx.ellipse(px, py, rx * sx, ry * sy, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  };
+  layer("#4a2609", 1, 2, 1, 1, 0, 0);
+  layer("#8d5a2b", 0, 0, 1, 1, 0, 0);
+  layer("rgba(255,220,170,0.25)", 0, 0, 0.4, 0.3, -0.3, -0.35);
+}
+
 // Dirt fill for the terrain polygon (already built as the current path by the caller).
-export function fillDirt(ctx) {
+export function fillDirt(ctx, viewWidth) {
   const pat = ctx.createPattern(_dirt, "repeat");
   pat.setTransform(new DOMMatrix().translate(-S.cameraPanX, -S.cameraPanY));
   ctx.fillStyle = pat;
   ctx.fill();
+  ctx.save();
+  ctx.clip();
+  _drawPebbles(ctx, viewWidth);
   // Darken with depth.
   const g = ctx.createLinearGradient(0, 300 - S.cameraPanY, 0, CANVAS_HEIGHT + 200 - S.cameraPanY);
   g.addColorStop(0, "rgba(20,8,0,0)");
   g.addColorStop(1, "rgba(20,8,0,0.55)");
   ctx.fillStyle = g;
-  ctx.fill();
+  ctx.fillRect(-PAD, -PAD, viewWidth + 2 * PAD, CANVAS_HEIGHT + 60 + 2 * PAD);
+  ctx.restore();
 }
 
 // ---- Flags ----------------------------------------------------------------
@@ -200,12 +233,17 @@ export function drawBestFlag(ctx, viewWidth, score) {
   const x = wx - S.cameraPanX;
   if (x < -60 || x > viewWidth + 60 || wx >= finishPx()) return;
   const y = groundYAtPx(wx) - S.cameraPanY;
-  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(x - 1.5, y - 64, 3, 64);
-  ctx.fillStyle = "#ffc933";
-  ctx.beginPath(); ctx.moveTo(x + 1.5, y - 64); ctx.lineTo(x + 40, y - 54); ctx.lineTo(x + 1.5, y - 44); ctx.closePath(); ctx.fill();
   ctx.save();
   ctx.font = `13px ${DISPLAY_FONT}`;
-  ctx.fillStyle = "#5a3d00"; ctx.fillText("BEST", x + 5, y - 50);
+  // Swallowtail pennant sized to the text, so the label always fits inside it.
+  const w = ctx.measureText("BEST").width + 12, notch = 6, top = y - 64, h = 20;
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(x - 1.5, top, 3, 64);
+  ctx.fillStyle = "#ffc933";
+  ctx.beginPath();
+  ctx.moveTo(x + 1.5, top); ctx.lineTo(x + 1.5 + w + notch, top);
+  ctx.lineTo(x + 1.5 + w, top + h / 2); ctx.lineTo(x + 1.5 + w + notch, top + h);
+  ctx.lineTo(x + 1.5, top + h); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#5a3d00"; ctx.textBaseline = "middle"; ctx.fillText("BEST", x + 7, top + h / 2 + 1);
   ctx.restore();
 }
 

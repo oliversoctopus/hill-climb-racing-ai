@@ -20,7 +20,7 @@ function _text(ctx, s, x, y, font, color, align, outline) {
 // o: { label, color, score, time, lines: [string], dead, finished }
 export function drawPlayerPanel(ctx, x, y, o) {
   const lines = o.lines || [];
-  const h = 76 + lines.length * 19;
+  const h = lines.length ? 87 + lines.length * 19 : 80;   // ~16px below the last baseline
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
   ctx.fillStyle = "rgba(14,20,34,0.74)";
@@ -51,7 +51,7 @@ export function drawProgressBar(ctx, cx, y, w, markers, best) {
   const x = cx - w / 2;
   ctx.save();
   ctx.fillStyle = "rgba(14,20,34,0.6)";
-  _rr(ctx, x - 10, y - 12, w + 20, 24, 12); ctx.fill();
+  _rr(ctx, x - 14, y - 12, w + 28, 24, 12); ctx.fill();   // 14px pad clears the finish cap
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   _rr(ctx, x, y - 3, w, 6, 3); ctx.fill();
   const lead = markers.length ? markers[0] : null;
