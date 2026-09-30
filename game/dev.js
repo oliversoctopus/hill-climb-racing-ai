@@ -10,7 +10,7 @@ import { bpSetStatus, showToast } from "./cheats.js";
 
 // sha256(DEV_SALT + password). Change the password: recompute this and commit.
 const DEV_SALT = "hcr-dev-v1:";
-const DEV_HASH = "25d75143e939232ebd8be4f9d9d3930f4277d71b59b837a5c188015503bfe4b6";
+const DEV_HASH = "8b76f433375a6a83dba1e50afba0d39947817f6b567ec7824a98ee7f6e661ed3";
 const DEV_KEY = "hcr_dev_unlocked";
 
 const $ = id => document.getElementById(id);
