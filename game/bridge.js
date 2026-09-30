@@ -27,11 +27,8 @@ export const AiPolicy = H.AiPolicy;        // { PpoOnnxAgent, ConstantForwardAge
 export const DIRT_MASK = window.DIRT_MASK, DIRT_CATEGORY = window.DIRT_CATEGORY;
 export const GRASS_MASK = window.GRASS_MASK, GRASS_CATEGORY = window.GRASS_CATEGORY;
 
-// `spawningY` and `grassSprites` are genuinely shared with the physics layer:
-// Ground.randomizeGround() WRITES spawningY and READS grassSprites as globals, and
-// the game logic reads/writes spawningY too. They must stay `window` globals; these
-// accessors make the cross-boundary access explicit (a bare `spawningY = x` in a
-// module would silently create a module-local, not touch the global the classes see).
+// Ground.js reads/writes `spawningY` and `grassSprites` as window globals; a bare
+// `spawningY = x` in a module would create a module-local instead, hence accessors.
 export function getSpawningY() { return window.spawningY; }
 export function setSpawningY(v) { window.spawningY = v; }
 export function setGrassSprites(v) { window.grassSprites = v; }

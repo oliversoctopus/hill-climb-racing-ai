@@ -67,10 +67,8 @@ export function findSavedByName(name, exceptIndex) {
   return -1;
 }
 
-// Geometry equality with a tiny tolerance — the px vertices survive a save→load→save
-// round trip (which divides by SCALE and multiplies back) only up to float rounding, so
-// exact === would miss re-saves of a reloaded map. GEO_EPS (1e-6 px) is far below the
-// whole-pixel spacing between genuinely different maps.
+// A save→load→save round trip (÷SCALE, ×SCALE) changes px vertices by float rounding,
+// so compare with a tolerance far below the whole-pixel spacing between maps.
 const GEO_EPS = 1e-6;
 function _closeEq(a, b) { return Math.abs(a - b) <= GEO_EPS; }
 function _sameGeometry(a, b) {
