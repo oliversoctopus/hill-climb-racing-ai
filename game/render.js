@@ -189,6 +189,25 @@ function _followCamera(cam, focusX, focusYworld, anchorX) {
   cam.lastTargetY = targetY;
 }
 
+// Surface y at screen x, linearly interpolated along pts (searching from index k).
+function _surfY(pts, k, x) {
+  let j = k;
+  while (j > 0 && pts[j][0] > x) j--;
+  while (j < pts.length - 2 && pts[j + 1][0] < x) j++;
+  const a = pts[j], b = pts[j + 1];
+  return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]);
+}
+
+// One grass tuft at anchor (x, y), sheared so its base spans the surface under it.
+function _drawTuft(ctx, spr, pts, k, x, y) {
+  const hw = spr.width / 2;
+  const m = (_surfY(pts, k, x + hw) - _surfY(pts, k, x - hw)) / spr.width;
+  ctx.save();
+  ctx.transform(1, m, 0, 1, x, y);
+  ctx.drawImage(spr, -hw, -spr.height / 2 - 15);
+  ctx.restore();
+}
+
 // Draw sky + ground + grass for the current global cameraPanX/cameraPanY into a
 // viewport `viewWidth` px wide (local coords; caller sets up clip/translate).
 function _drawScenery(ctx, viewWidth, timeSec) {
@@ -210,6 +229,26 @@ function _drawScenery(ctx, viewWidth, timeSec) {
     topPts.push([vx - S.cameraPanX, vy - S.cameraPanY]);
     topIdx.push(i);
   }
+
+  // Grass sprites (Ground.js show()). Each vertex has 2 grass slots: grassPositions[2i]
+  // at vertex i, grassPositions[2i+1] halfway to vertex i+1. -1 = no sprite. Centered on
+  // its anchor with a -15 px y-offset. Drawn BEFORE the ground so the grass band hides
+  // the tufts' pale bases, and vertically sheared so each base follows the local slope
+  // (blades stay upright) — otherwise slopes bury one side in dirt.
+  if (ground.grassPositions && assets.grass && topIdx.length > 1) {
+    const gp = ground.grassPositions;
+    for (let k = 0; k < topIdx.length - 1; k++) {
+      const i = topIdx[k];
+      const sIdx = gp[2 * i];
+      if (sIdx !== undefined && sIdx >= 0 && sIdx < assets.grass.length)
+        _drawTuft(ctx, assets.grass[sIdx], topPts, k, topPts[k][0], topPts[k][1]);
+      const sIdx2 = gp[2 * i + 1];
+      if (sIdx2 !== undefined && sIdx2 >= 0 && sIdx2 < assets.grass.length)
+        _drawTuft(ctx, assets.grass[sIdx2], topPts, k,
+                  (topPts[k][0] + topPts[k+1][0]) / 2, (topPts[k][1] + topPts[k+1][1]) / 2);
+    }
+  }
+
   if (topPts.length >= 2) {
     const bottom = CANVAS_HEIGHT + 60;   // overdraw for screen shake
     ctx.beginPath();
@@ -243,32 +282,6 @@ function _drawScenery(ctx, viewWidth, timeSec) {
       ctx.moveTo(topPts[0][0], topPts[0][1] + off);
       for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i][0], topPts[i][1] + off);
       ctx.stroke();
-    }
-  }
-
-  // Grass sprites (Ground.js show()). Each vertex has 2 grass slots: grassPositions[2i]
-  // at vertex i, grassPositions[2i+1] halfway to vertex i+1. -1 = no sprite. Centered on
-  // its anchor with a -15 px y-offset (so it sits ABOVE the terrain line).
-  if (ground.grassPositions && assets.grass && topIdx.length > 1) {
-    const gp = ground.grassPositions;
-    for (let k = 0; k < topIdx.length - 1; k++) {
-      const i = topIdx[k];
-      const sIdx = gp[2 * i];
-      if (sIdx !== undefined && sIdx >= 0 && sIdx < assets.grass.length) {
-        const spr = assets.grass[sIdx];
-        ctx.drawImage(spr,
-          topPts[k][0] - spr.width / 2,
-          topPts[k][1] - spr.height / 2 - 15);
-      }
-      const sIdx2 = gp[2 * i + 1];
-      if (sIdx2 !== undefined && sIdx2 >= 0 && sIdx2 < assets.grass.length) {
-        const spr = assets.grass[sIdx2];
-        const midX = (topPts[k][0] + topPts[k+1][0]) / 2;
-        const midY = (topPts[k][1] + topPts[k+1][1]) / 2;
-        ctx.drawImage(spr,
-          midX - spr.width / 2,
-          midY - spr.height / 2 - 15);
-      }
     }
   }
 
