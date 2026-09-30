@@ -8,7 +8,7 @@
 // in the global LEXICAL environment, invisible to module scope, so index.html
 // publishes exactly what the app needs onto `window.HCR` in a one-line classic
 // shim (right after the physics scripts). We re-export it here as normal module
-// bindings. (See CONVENTIONS.md #4 / CLAUDE.md gotcha #4.)
+// bindings.
 const H = window.HCR || {};
 
 export const Car = H.Car;

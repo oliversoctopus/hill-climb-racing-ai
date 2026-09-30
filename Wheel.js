@@ -1,5 +1,5 @@
 // NOTE: show() below is p5 render, used ONLY by legacy_neat/ (not the web AI site
-// or the training path). Kept for legacy_neat. CONVENTIONS.md #8.
+// or the training path). Kept for legacy_neat.
 class Wheel {
   constructor(x, y, r, chassisBody, world) {
 

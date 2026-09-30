@@ -1,7 +1,7 @@
 // NOTE: setShirt(), show() and update() below are used ONLY by legacy_neat/ (the
 // p5 NEAT game). The web AI site (index.html) renders itself, and the training
 // path (js_backend.py) calls the physics API directly — neither calls these.
-// Kept for legacy_neat; don't rely on them here. CONVENTIONS.md #8/#9.
+// Kept for legacy_neat; don't rely on them here.
 class Car {
   constructor(x, y, world, player) {
     this.world = world;

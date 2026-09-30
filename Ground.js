@@ -1,5 +1,5 @@
 // NOTE: show() and showPoints() below are p5 render, used ONLY by legacy_neat/
-// (not the web AI site or training path). Kept for legacy_neat. CONVENTIONS.md #8.
+// (not the web AI site or training path). Kept for legacy_neat.
 class Ground {
 
   constructor(world) {

@@ -1,4 +1,4 @@
-// Coordinate/sign helpers (CONVENTIONS.md #3).
+// Coordinate/sign helpers.
 //
 // World space is y-DOWN: larger y = lower on screen. That makes clearance/altitude
 // sign errors easy to introduce, so the two sign conventions live here, named, in
