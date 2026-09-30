@@ -138,7 +138,7 @@ function devQuickLoad() {
     if (s.agent) p.agent.restoreState(s.agent);
     for (const k of P_KEYS) p[k] = s.keys[k];
   });
-  S.runTainted = true;   // save-scumming isn't a clean run
+  S.runTainted = S.runModified = true;   // save-scumming isn't a clean run
   snapRenderPoses();
   showToast(`⤺ Loaded tick ${S.tickCount} (run now counts as cheated)`);
 }

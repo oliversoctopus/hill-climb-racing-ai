@@ -210,8 +210,10 @@ export function fmtTime(sec) {
 }
 
 // Anything that makes a run easier than a straight drive.
-export function cheatsActive() {
-  return S.bpInvincible || S.bpZeroG || S.bpFlight || S.bpRocket || S.simSpeed < 1 || S.bpPhysModified
+export function cheatsActive() { return S.simSpeed < 1 || physicsModified(); }
+// The subset that changes the physics itself (slow-mo only changes the player's reaction time).
+export function physicsModified() {
+  return S.bpInvincible || S.bpZeroG || S.bpFlight || S.bpRocket || S.bpPhysModified
       || !!(S.ground && S.ground.tuned);   // a playground-generated map (flat/short/...)
 }
 

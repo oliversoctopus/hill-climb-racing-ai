@@ -14,8 +14,9 @@ import { T, tuneTick, tuneGroundPre, tuneGroundPost, terrainTuned, syncGroundDim
 import { humanAction, humanActionWASD, humanActionAny } from "./input.js";
 import { recordTick, applyFlyCheats, bpSetZeroG,
          bpSyncExitButton } from "./cheats.js";
-import { mapKeyOf, mapRecord, mapRecordAll, globalRecord, commitRun, cheatsActive, refreshRecordsStrip,
+import { mapKeyOf, mapRecord, mapRecordAll, globalRecord, commitRun, cheatsActive, physicsModified, refreshRecordsStrip,
          recordMapLabel } from "./records.js";
+import { hrAction, hrAfterTick, hrFinish } from "./humanruns.js";
 
 // ---- Score metric --------------------------------------------------------
 // Project score: (max forward px − spawn) / 10, floored, >= 0. Matches eval.py
@@ -262,7 +263,7 @@ function spawnPlayers(spawnDx, spawnDy) {
 export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   S.worldGen += 1;  // invalidates any in-flight runOneStep awaiting from the old world
   // An abandoned human run (Restart/Regenerate mid-drive) still counts toward records.
-  for (const p of S.players) if (!p.isAI && !p.dead) commitRun(p, scoreOf(p), scoreParts(p));
+  for (const p of S.players) if (!p.isAI && !p.dead) { commitRun(p, scoreOf(p), scoreParts(p)); hrFinish(p, "abandoned"); }
   S.bpZeroG = false;  // fresh world has normal gravity; clear any stale float state
   S.world = new b2World(new Vec2(0, 10), false);
   S.listener = makeContactListener(S.world);
@@ -284,7 +285,7 @@ export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy)
 
   // Records: identify the map and snapshot the bests to beat for this run.
   S.mapKey = mapKeyOf(S.ground);
-  S.runTainted = false;
+  S.runTainted = S.runModified = false;
   S.recStart = { map: mapRecord(S.mapKey), global: { ...globalRecord() }, all: { ...mapRecordAll(S.mapKey) } };
   refreshRecordsStrip();
 
@@ -485,6 +486,7 @@ export async function runOneStep() {
       action = (p.control === "wasd")   ? humanActionWASD()
              : (p.control === "arrows") ? humanAction()
              :                            humanActionAny();
+      hrAction(p, action);
     }
     applyAction(p.car, action);
   }
@@ -498,6 +500,7 @@ export async function runOneStep() {
   recordTick();   // bug probe: log human-car state this tick (no-op if no human)
 
   if (cheatsActive()) S.runTainted = true;
+  if (physicsModified()) S.runModified = true;
   let allDead = true;
   for (let pi = 0; pi < S.players.length; pi++) {
     const p = S.players[pi];
@@ -505,6 +508,7 @@ export async function runOneStep() {
     const hadBeat = p.beatTick;
     _checkPlayerEndOfStep(p);
     if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p), scoreParts(p));
+    if (!p.isAI) hrAfterTick(p);
     if (!p.dead) allDead = false;
   }
   _recordRenderPoses();   // dead cars too — the world keeps stepping their ragdolls

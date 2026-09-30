@@ -141,6 +141,7 @@ export const S = {
   // Records (see records.js)
   mapKey: "",               // geometry hash of the current map
   runTainted: false,        // a cheat / slow-mo was used this run → don't record it
+  runModified: false,       // a physics-changing cheat was used this run (slow-mo excluded)
   recStart: null,           // { map, global } records as they stood when the run began
   bpPhysModified: false,    // debug physics/motor knobs are off their defaults
 

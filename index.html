@@ -206,6 +206,13 @@
       <button id="bp_motorspin" class="danger" title="Motor speed ×2: reproduces the sustained CCW spin">🌀 Motor-spin</button>
     </div>
     <div class="dbg">
+      Human runs (every clean run you drive while dev mode is on):<br>
+      <button id="hr_download" title="Download every stored run: per-tick actions + the terrain">💾 Save runs</button>
+      <button id="hr_clear" class="danger" title="Delete every stored run from this browser">Clear all</button><br>
+      <span id="hr_count"></span>
+      <div id="hr_list"></div>
+    </div>
+    <div class="dbg">
       Bug probe <span>(use <b>You drive</b>)</span>:<br>
       <button id="bp_flag" title="Mark this moment in the recording so it is easy to find later" style="background:#a63;">⚑ Flag unusual</button>
       <button id="bp_download">Download recording</button><br>

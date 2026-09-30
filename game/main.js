@@ -23,6 +23,7 @@ import {
 import { focusGame, _handleGameKey, _handleActionKey, _handleModeKey } from "./input.js";
 import { buildTunePanel, setTune, resetTune, TUNE_PRESETS } from "./tune.js";
 import { initDevMode, devAfterInit } from "./dev.js";
+import { initHumanRuns } from "./humanruns.js";
 
 export function setStatus(s) { document.getElementById("status").textContent = s; }
 
@@ -720,6 +721,7 @@ document.getElementById("bp_unmask").onclick = () =>
 // Motor-spin: double the motor's target speed — floor it to provoke the sustained CCW spin.
 document.getElementById("bp_motorspin").onclick = () => setTune({ motorSpeed: 2 });
 initDevMode({ loadTerrain: loadTerrainObject });
+initHumanRuns();
 
 // Keybinds cheat-sheet overlay.
 document.getElementById("keybinds_btn").onclick = () => {
