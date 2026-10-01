@@ -91,13 +91,17 @@ export { _setupHiDPI };
 // timestep). We accumulate real wall time and run however many steps that
 // corresponds to. simSpeed multiplies the accumulator so "2x" = 2 simulated seconds
 // per real second.
+const STALL_SEC = 0.1;
+let _lastDt = 1 / 60;
 async function loop() {
   const now = performance.now();
   if (S.lastWallMs === 0) S.lastWallMs = now;
-  // Real wall seconds since last frame. Cap at 100ms so a tab-background pause doesn't
-  // cause a burst of catch-up steps when we resume.
-  const realDt = Math.min(0.1, (now - S.lastWallMs) / 1000);
+  // A longer gap is a stall (an extension script, a background tab): resume where the
+  // screen froze instead of catching up, so no physics runs that the player never saw.
+  const gap = (now - S.lastWallMs) / 1000;
   S.lastWallMs = now;
+  if (gap <= STALL_SEC) _lastDt = gap;
+  const realDt = gap <= STALL_SEC ? gap : _lastDt;
 
   let didStep = false;
   if (!S.paused && S.aiAgent && !S.bestofxBusy) {
