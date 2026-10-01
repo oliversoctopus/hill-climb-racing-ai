@@ -51,18 +51,27 @@ function _layerFor(cv) {
   return _lctx;
 }
 
-// Emit dust puffs + clods behind every grounded, powered wheel of a live car.
+// Emit dust + clods behind every grounded wheel, scaled by slip (tire surface speed
+// omega*R vs. ground speed): clean rolling slips ~1 m/s, spinning out 10-25 m/s.
+const SLIP_DEADBAND = 1;                         // m/s of slip that counts as rolling
 export function emitDust(p, dt) {
   const car = p.car;
-  if (!car || p.dead || !car.motorState) return;
+  if (!car || p.dead) return;
   const v = car.chassisBody.GetLinearVelocity();
   const speed = Math.hypot(v.x, v.y);
-  const dir = -car.motorState;                   // kicked opposite the drive direction
   for (const w of car.wheels) {
     if (w.onGround !== true) continue;
+    const wv = w.body.GetLinearVelocity();
+    const ground = Math.sign(wv.x) * Math.hypot(wv.x, wv.y);   // signed along-track speed
+    const rel = ground - w.body.GetAngularVelocity() * w.radius / SCALE;  // contact-patch velocity
+    const slip = Math.max(0, Math.abs(rel) - SLIP_DEADBAND);
+    const base = car.motorState ? 5 + speed * 1.2 : 0;   // light dust from powered rolling
+    if (base + slip < 0.5) continue;
+    const dir = slip > 0 ? Math.sign(rel) : -car.motorState;   // dirt leaves with the contact patch
+    const kick = 1 + Math.min(slip, 15) / 15 * 0.8;   // harder spin throws clods farther
     const c = w.body.GetPosition();
     const cx = c.x * SCALE, cy = c.y * SCALE + w.radius * 0.8;
-    let n = (14 + speed * 3) * dt;               // puffs per second
+    let n = (base + slip * 6) * dt;              // puffs per second
     while (n > 0 && puffs.length < MAX_PUFFS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
@@ -76,14 +85,14 @@ export function emitDust(p, dt) {
         s: Math.floor(Math.random() * N_SHAPES), life: 0, max: 0.7 + Math.random() * 0.6,
       });
     }
-    n = (4 + speed * 1.5) * dt;                    // clods per second
+    n = (base * 0.3 + slip * 2.5) * dt;            // clods per second
     while (n > 0 && clods.length < MAX_CLODS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
       clods.push({
         x: cx + (Math.random() - 0.5) * 8, y: cy - 2,
-        vx: dir * (60 + Math.random() * 120) + v.x * SCALE * 0.3,
-        vy: -(60 + Math.random() * 130),
+        vx: dir * (60 + Math.random() * 120) * kick + v.x * SCALE * 0.3,
+        vy: -(60 + Math.random() * 130) * kick,
         sz: 1.2 + Math.random() * 1.4, rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 20,
         c: Math.random() < 0.2 ? GRASS_FLECK : CLOD_COLORS[Math.floor(Math.random() * CLOD_COLORS.length)],
         life: 0, max: 0.35 + Math.random() * 0.35,
