@@ -51,27 +51,27 @@ function _layerFor(cv) {
   return _lctx;
 }
 
-// Emit dust + clods behind every grounded wheel, scaled by slip (tire surface speed
-// omega*R vs. ground speed): clean rolling slips ~1 m/s, spinning out 10-25 m/s.
-const SLIP_DEADBAND = 1;                         // m/s of slip that counts as rolling
+// Emit dust + clods per wheel, scaled by the friction heat (J) sim.js's contact listener
+// accumulated since the last frame. Spinning out or a skidding landing runs ~1-4 kW.
+const PUFFS_PER_J = 0.045, CLODS_PER_J = 0.018, KICK_FULL_W = 3000;
 export function emitDust(p, dt) {
   const car = p.car;
-  if (!car || p.dead) return;
+  if (!car) return;
+  // Capped so heat banked while rendering was skipped (search, ghost replay) can't burst.
+  const hMax = 2 * KICK_FULL_W * Math.max(dt, 1 / 30);
+  const heat = car.wheels.map(w => { const h = Math.min(w.fxHeat || 0, hMax), d = w.fxHeatDir || 0; w.fxHeat = w.fxHeatDir = 0; return [h, d]; });
+  if (p.dead) return;
   const v = car.chassisBody.GetLinearVelocity();
   const speed = Math.hypot(v.x, v.y);
-  for (const w of car.wheels) {
-    if (w.onGround !== true) continue;
-    const wv = w.body.GetLinearVelocity();
-    const ground = Math.sign(wv.x) * Math.hypot(wv.x, wv.y);   // signed along-track speed
-    const rel = ground - w.body.GetAngularVelocity() * w.radius / SCALE;  // contact-patch velocity
-    const slip = Math.max(0, Math.abs(rel) - SLIP_DEADBAND);
-    const base = car.motorState ? 5 + speed * 1.2 : 0;   // light dust from powered rolling
-    if (base + slip < 0.5) continue;
-    const dir = slip > 0 ? Math.sign(rel) : -car.motorState;   // dirt leaves with the contact patch
-    const kick = 1 + Math.min(slip, 15) / 15 * 0.8;   // harder spin throws clods farther
+  car.wheels.forEach((w, i) => {
+    const [h, hd] = heat[i];
+    const base = car.motorState && w.onGround === true ? 5 + speed * 1.2 : 0;   // light dust from powered rolling
+    if (base * dt + h * PUFFS_PER_J < 0.01) return;
+    const dir = hd ? Math.sign(hd) : -car.motorState;   // dirt leaves with the contact patch
+    const kick = 1 + Math.min(h / Math.max(dt, 1e-3), KICK_FULL_W) / KICK_FULL_W * 0.8;   // harder skid throws clods farther
     const c = w.body.GetPosition();
     const cx = c.x * SCALE, cy = c.y * SCALE + w.radius * 0.8;
-    let n = (base + slip * 6) * dt;              // puffs per second
+    let n = base * dt + h * PUFFS_PER_J;
     while (n > 0 && puffs.length < MAX_PUFFS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
@@ -85,7 +85,7 @@ export function emitDust(p, dt) {
         s: Math.floor(Math.random() * N_SHAPES), life: 0, max: 0.7 + Math.random() * 0.6,
       });
     }
-    n = (base * 0.3 + slip * 2.5) * dt;            // clods per second
+    n = base * 0.3 * dt + h * CLODS_PER_J;
     while (n > 0 && clods.length < MAX_CLODS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
@@ -98,7 +98,7 @@ export function emitDust(p, dt) {
         life: 0, max: 0.35 + Math.random() * 0.35,
       });
     }
-  }
+  });
 }
 
 export function shake(mag, dur) { shakeMag = Math.max(shakeMag, mag); shakeT = Math.max(shakeT, dur); }

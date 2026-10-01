@@ -124,8 +124,44 @@ export function makeContactListener(w) {
     if (udA.id == "wheel" && udB.id == "ground") udA.onGround = false;
     if (udB.id == "wheel" && udA.id == "ground") udB.onGround = false;
   };
+  // Friction heat per tire for fx dust: tangent impulse x contact slip, averaged over
+  // the step, since one step's friction can spin a skidding tire up to rolling speed.
+  L.PreSolve = contact => {
+    const s = _tireSlip(contact);
+    if (s) contact._slipPre = s.v;
+  };
+  L.PostSolve = (contact, impulse) => {
+    const s = _tireSlip(contact);
+    if (!s) return;
+    let j = 0;
+    for (let i = 0; i < contact.GetManifold().m_pointCount; i++) j += Math.abs(impulse.tangentImpulses[i]);
+    const pre = contact._slipPre ?? s.v;
+    s.wheel.fxHeat = (s.wheel.fxHeat || 0) + j * (Math.abs(pre) + Math.abs(s.v)) / 2;
+    s.wheel.fxHeatDir = (s.wheel.fxHeatDir || 0) + j * pre;   // sign = way the dirt flies
+  };
   w.SetContactListener(L);
   return L;
+}
+
+// Tangential velocity (m/s, +x-ish = rightward) of a tire's contact patch over the
+// ground, or null if the contact isn't tire-on-ground. Read-only: never touches physics.
+const _wm = new Box2D.Collision.b2WorldManifold();
+function _tireSlip(contact) {
+  const bA = contact.GetFixtureA().GetBody(), bB = contact.GetFixtureB().GetBody();
+  const udA = bA.GetUserData(), udB = bB.GetUserData();
+  if (!udA || !udB) return null;
+  let tire, sgn;
+  if (udA.id == "wheel" && udB.id == "ground" && bA === udA.body) { tire = bA; sgn = 1; }
+  else if (udB.id == "wheel" && udA.id == "ground" && bB === udB.body) { tire = bB; sgn = -1; }
+  else return null;
+  contact.GetWorldManifold(_wm);
+  const nx = _wm.m_normal.x * sgn, ny = _wm.m_normal.y * sgn;   // tire centre -> ground
+  const R = tire.GetUserData().radius / SCALE, om = tire.GetAngularVelocity();
+  const v = tire.GetLinearVelocity();
+  const px = v.x - om * R * ny, py = v.y + om * R * nx;   // v + omega x (R n)
+  let tx = -ny, ty = nx;
+  if (tx < 0) { tx = -tx; ty = -ty; }                      // orient tangent rightward
+  return { wheel: tire.GetUserData(), v: px * tx + py * ty };
 }
 
 // ---- Players -------------------------------------------------------------
