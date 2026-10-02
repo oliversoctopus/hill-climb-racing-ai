@@ -53,7 +53,7 @@ function _layerFor(cv) {
 
 // Emit dust + clods per wheel, scaled by the friction heat (J) sim.js's contact listener
 // accumulated since the last frame. Spinning out or a skidding landing runs ~1-4 kW.
-const PUFFS_PER_J = 0.045, CLODS_PER_J = 0.018, KICK_FULL_W = 3000;
+const PUFFS_PER_J = 0.015, CLODS_PER_J = 0.03, KICK_FULL_W = 3000;
 export function emitDust(p, dt) {
   const car = p.car;
   if (!car) return;
@@ -62,16 +62,14 @@ export function emitDust(p, dt) {
   const heat = car.wheels.map(w => { const h = Math.min(w.fxHeat || 0, hMax), d = w.fxHeatDir || 0; w.fxHeat = w.fxHeatDir = 0; return [h, d]; });
   if (p.dead) return;
   const v = car.chassisBody.GetLinearVelocity();
-  const speed = Math.hypot(v.x, v.y);
   car.wheels.forEach((w, i) => {
     const [h, hd] = heat[i];
-    const base = car.motorState && w.onGround === true ? 5 + speed * 1.2 : 0;   // light dust from powered rolling
-    if (base * dt + h * PUFFS_PER_J < 0.01) return;
-    const dir = hd ? Math.sign(hd) : -car.motorState;   // dirt leaves with the contact patch
+    if (h <= 0) return;
+    const dir = Math.sign(hd);                   // dirt leaves with the contact patch
     const kick = 1 + Math.min(h / Math.max(dt, 1e-3), KICK_FULL_W) / KICK_FULL_W * 0.8;   // harder skid throws clods farther
     const c = w.body.GetPosition();
     const cx = c.x * SCALE, cy = c.y * SCALE + w.radius * 0.8;
-    let n = base * dt + h * PUFFS_PER_J;
+    let n = h * PUFFS_PER_J;
     while (n > 0 && puffs.length < MAX_PUFFS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
@@ -85,7 +83,7 @@ export function emitDust(p, dt) {
         s: Math.floor(Math.random() * N_SHAPES), life: 0, max: 0.7 + Math.random() * 0.6,
       });
     }
-    n = base * 0.3 * dt + h * CLODS_PER_J;
+    n = h * CLODS_PER_J;
     while (n > 0 && clods.length < MAX_CLODS) {
       if (n < 1 && Math.random() > n) break;
       n -= 1;
@@ -93,9 +91,9 @@ export function emitDust(p, dt) {
         x: cx + (Math.random() - 0.5) * 8, y: cy - 2,
         vx: dir * (60 + Math.random() * 120) * kick + v.x * SCALE * 0.3,
         vy: -(60 + Math.random() * 130) * kick,
-        sz: 1.2 + Math.random() * 1.4, rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 20,
+        sz: 1.8 + Math.random() * 2.2, rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 20,
         c: Math.random() < 0.2 ? GRASS_FLECK : CLOD_COLORS[Math.floor(Math.random() * CLOD_COLORS.length)],
-        life: 0, max: 0.35 + Math.random() * 0.35,
+        life: 0, max: 0.5 + Math.random() * 0.4,
       });
     }
   });
