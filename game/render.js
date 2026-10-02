@@ -603,8 +603,9 @@ export function render() {
   _fxLastMs = now;
   if (S.worldGen !== _fxGen) { _fxGen = S.worldGen; clearFx(); _endCard = null; _allDeadAt = 0; _recCache = null; }
   if (!S.paused) {
-    stepFx(dt);
-    if (!S.ghostPoses) for (const p of S.players) emitDust(p, dt);
+    const simDt = dt * S.simSpeed;   // dirt lives in sim time so slow-mo slows it too
+    stepFx(dt, simDt);
+    if (!S.ghostPoses) for (const p of S.players) emitDust(p, simDt);
   }
   _detectEvents(now);
   _toggleWant = null;

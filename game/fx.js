@@ -1,5 +1,5 @@
 // Cosmetic effects: wheel dust + dirt clods (world space), screen shake, and confetti
-// (screen space). Advanced from render() with wall-clock dt so they never touch the physics.
+// (screen space). Advanced from render(), not the physics step, so they never touch the physics.
 import { S, SCALE, CANVAS_HEIGHT } from "./state.js";
 
 const puffs = [];     // soft dust haze
@@ -119,9 +119,21 @@ export function burstConfetti(width) {
   }
 }
 
-export function stepFx(dt) {
+// dt is wall-clock (shake, confetti); simDt is dt × sim speed (dust, clods).
+export function stepFx(dt, simDt = dt) {
   shakeT = Math.max(0, shakeT - dt);
   if (shakeT === 0) shakeMag = 0;
+  stepDirt(simDt);
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.life += dt;
+    if (c.life >= c.max || c.y > CANVAS_HEIGHT + 30) { confetti.splice(i, 1); continue; }
+    c.x += (c.vx + Math.sin(c.life * 3 + c.rot) * 40) * dt;
+    c.y += c.vy * dt; c.rot += c.vr * dt;
+  }
+}
+
+function stepDirt(dt) {
   const drag = Math.exp(-2.5 * dt);
   for (let i = puffs.length - 1; i >= 0; i--) {
     const d = puffs[i];
@@ -139,13 +151,6 @@ export function stepFx(dt) {
     if (c.life >= c.max) { clods.splice(i, 1); continue; }
     c.x += c.vx * dt; c.y += c.vy * dt;
     c.vy += 600 * dt; c.rot += c.vr * dt;
-  }
-  for (let i = confetti.length - 1; i >= 0; i--) {
-    const c = confetti[i];
-    c.life += dt;
-    if (c.life >= c.max || c.y > CANVAS_HEIGHT + 30) { confetti.splice(i, 1); continue; }
-    c.x += (c.vx + Math.sin(c.life * 3 + c.rot) * 40) * dt;
-    c.y += c.vy * dt; c.rot += c.vr * dt;
   }
 }
 
