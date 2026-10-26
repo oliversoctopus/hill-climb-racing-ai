@@ -1,29 +1,17 @@
-// Personal records (human runs only), persisted in localStorage: best score and fastest
-// finish time, per map and across all maps. A map is identified by a hash of its
-// geometry, so the same terrain matches whether it was generated, re-loaded from the
-// session list, or loaded from Saved. Runs that used a cheat (or slow-mo) are "tainted":
-// they never count toward the clean records, only toward a second "incl. cheats" track
-// (m.all) — the best of ALL runs, each value flagged with whether a cheated run set it.
-// A clean run that beats that track updates it too; a cheated run never touches the
-// clean one. The UI shows the second track behind a "Show cheat records" checkbox.
-//
-// Every map a human run sets something on (or attempts) gets an entry and a stored copy of
-// its terrain, so it can be re-loaded from the Records menu. Only notable maps are listed
-// and kept for good (m.keep, the reason; rules in records_rules.js) or ones you pin
-// (m.pinned); the rest stay unlisted and expire KEEP_DAYS after their last attempt
-// (m.last), unless they're Saved or loaded. A map gets its sequential `id` when it first
-// becomes notable or pinned. Clean and cheat notability are separate: a map notable only
-// through cheats is hidden while cheat records are.
-// Terrains live in IndexedDB (they're the bulky part; localStorage's quota filled up),
-// the small records blob stays in localStorage so the strip and menu can read it synchronously.
-// No names are stored: the label is resolved at display time — the map's current Saved
-// name if it's saved, else "Record map <id>". The all-maps bests are derived from the
-// per-map entries, so deleting a record map can't leave a stale global.
+// Personal records (human runs only): best score and fastest finish per map (keyed by a
+// geometry hash) and across all maps, derived from the per-map entries. Cheated or slow-mo
+// runs count only toward a second "incl. cheats" track (m.all), shown behind a checkbox.
+// Every map a run sets something on or attempts gets an entry, plus its terrain in
+// IndexedDB (the small blob stays in localStorage, read synchronously). Only notable maps
+// (m.keep, rules in records_rules.js) and pinned ones are listed, kept for good and given
+// a sequential `id`; the rest expire KEEP_DAYS after their last attempt unless Saved or
+// loaded. Clean and cheat notability are separate, and cheat-only maps hide with the cheat
+// records. Labels are resolved at display time: the Saved name, else "Record map <id>".
 import { S, SCALE, FRAME_RATE } from "./state.js";
 import { getSpawningY, Vec2 } from "./bridge.js";
 import { loadSavedTerrains } from "./saved_terrains.js";
 import { ATTEMPT_SEC, ATTEMPT_SCORE, NEAR_FINISH, KEEP_DAYS, CHEAT_ATTEMPTS, ladder, finishNotable,
-         fastCutoff } from "./records_rules.js";
+         fastCutoff, classifyLegacy } from "./records_rules.js";
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -243,8 +231,35 @@ export async function initRecords() {
     for (const k of Object.keys(_legacyMaps())) _storedKeys.add(k);
     _warn(`Record maps' terrains couldn't move to IndexedDB (${e && e.message}).`);
   }
+  if (_load().schema !== 2) await _migrateLegacy();
   _expire();
   refreshRecordsStrip();
+}
+// Entries from before attempts were counted get their notability from classifyLegacy();
+// the rest start a fresh KEEP_DAYS clock and lose their id.
+async function _migrateLegacy() {
+  const runs = await _humanRunSummaries();
+  const d = _load(), now = Date.now();
+  const cls = classifyLegacy(Object.entries(d.maps).map(([key, m]) => ({ key, ...m })), runs, FRAME_RATE);
+  for (const [k, m] of Object.entries(d.maps)) {
+    const c = cls[k];
+    m.att = c.att; m.keep = { clean: c.clean, cheat: c.cheat }; m.pinned = false; m.last = now;
+    if (!c.clean && !c.cheat) m.id = null;
+    if (m.bestTime != null) d.finishPool[k] = m.bestTime;
+  }
+  d.schema = 2;
+  _save(d);
+}
+// The human-run recorder's run summaries (dev mode), or [] if it never recorded.
+async function _humanRunSummaries() {
+  try {
+    if (indexedDB.databases && !(await indexedDB.databases()).some(x => x.name === "hcr_human_runs")) return [];
+    const db = await _req(indexedDB.open("hcr_human_runs"));
+    if (!db.objectStoreNames.contains("runs")) { db.close(); return []; }
+    const runs = await _req(db.transaction("runs", "readonly").objectStore("runs").getAll());
+    db.close();
+    return runs;
+  } catch (e) { return []; }
 }
 // Drop unlisted maps whose last attempt is over KEEP_DAYS old. Only on schema-2 data,
 // whose notability has been worked out (older entries would all look expendable).
@@ -277,10 +292,8 @@ function _label(d, key, saved) {
 }
 export function recordMapLabel(key) { return _label(_load(), key, _savedNames()); }
 
-// Every map with an entry for the Records menu, oldest id first (unlisted ones, which have
-// no id, last). `clean` = has a clean record (a map can hold only cheated ones); `all` =
-// its incl.-cheats track; `listed` = shown without "Show all"; `expiresIn` = days left
-// (null when it's kept for good).
+// Every map with an entry for the Records menu, oldest id first, unlisted (no id) last.
+// `listed` = shown without "Show all"; `expiresIn` = days left, null when kept for good.
 export function listRecordMaps() {
   const d = _load(), saved = _savedNames(), g = _global(d), ga = _globalAll(d), now = Date.now();
   const show = showCheatRecords();
@@ -354,13 +367,8 @@ function _attemptKind(p, score, cheated) {
   return score >= ATTEMPT_SCORE ? "clean" : null;
 }
 
-// Fold a human player's run into the stored records. Idempotent (max/min), so it's safe
-// to call on finish, on death, and again when the run is abandoned. New-record flags
-// are OR-ed onto p.newRec for the end card (clean: mapScore/globalScore/...; incl.-cheats
-// track: allMapScore/allGlobalScore/...). A map only gets an entry (stored terrain) once a
-// run sets something or counts as an attempt on it. `parts` (sim.scoreParts: to finish / fly-off /
-// after fly-off, or null if unfinished) is stored with each score record it sets.
-// `ended` (death or abandon) is when the run is counted as an attempt, once per run.
+// Fold a human run into the records; idempotent, so it's called on finish, death and abandon.
+// `ended` (death or abandon) counts the attempt, once per run. Flags for the end card go on p.newRec.
 export function commitRun(p, score, parts, ended = false) {
   if (!p || p.isAI || !S.mapKey) return;
   const cheated = S.runTainted;

@@ -234,9 +234,8 @@ function closeTerrainMenus() {
   document.getElementById("saved_panel").style.display = "none";
   document.getElementById("records_panel").style.display = "none";
 }
-// Records menu: all-maps bests on top, then every listed map (sortable), with Load (exact
-// stored terrain), Pin and Delete. "Show all" adds the unlisted maps, with their expiry.
-// With "Show cheat records" on, sort by the incl.-cheats track.
+// Records menu: all-maps bests, then every listed map with Load, Pin and Delete; "Show all"
+// adds the unlisted ones. With "Show cheat records" on, sort by the incl.-cheats track.
 const _sv = r => (showCheatRecords() ? r.all.score : r.bestScore);
 const _tv = r => (showCheatRecords() ? r.all.time : r.bestTime);
 const _byId = (a, b) => (a.id ?? Infinity) - (b.id ?? Infinity) || (_sv(b) - _sv(a));   // unlisted (no id) last
