@@ -416,7 +416,11 @@ export function commitRun(p, score, parts, ended = false) {
   const why = _keepReasons(d, m, nr, finishedNow);
   if (!m.keep.clean && why.clean) m.keep.clean = why.clean;
   if (!m.keep.cheat && why.cheat) m.keep.cheat = why.cheat;
-  if (!wasKept && (m.keep.clean || m.keep.cheat)) { _promote(d, m); nr.kept = m.keep.clean || m.keep.cheat; }
+  if (!wasKept && (m.keep.clean || m.keep.cheat)) {
+    _promote(d, m);
+    nr.kept = m.keep.clean || m.keep.cheat;
+    nr.keptCheatOnly = !m.keep.clean;
+  }
   _save(d);
   refreshRecordsStrip();
 }

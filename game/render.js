@@ -545,6 +545,12 @@ function _partsRows(p) {
             ["  ·  ", "#c9d4e2"], pt.after ? [`↗${pt.after}`, CHEAT_RED] : ["0", "#c9d4e2"]]]];
 }
 function _runLine(p) { return `${scoreOf(p)}  ·  ${p.beatTick ? fmtTime(runSeconds(p)) : "DNF"}`; }
+// A run that made this map notable. Kept only through cheats: it lists with the cheat records.
+function _keptRows(p) {
+  const r = p.newRec;
+  if (!r || !r.kept) return [];
+  return [[r.keptCheatOnly ? "Map kept in cheat records" : "Map kept in Records", r.kept]];
+}
 
 // End card for the single-screen modes, built once when everyone is dead.
 function _buildEndCard() {
@@ -577,7 +583,7 @@ function _buildEndCard() {
     if (S.runTainted) card.subtitle = taintNote;
     card.rows.push(["You  (score · time)", _runLine(hum), _scoreBadge(hum) || _timeBadge(hum)], ..._partsRows(hum));
     card.rows.push(["AI  (score · time)", _runLine(ai)], ..._partsRows(ai));
-    if (hum.newRec && hum.newRec.kept) card.rows.push(["Map kept in Records", hum.newRec.kept]);
+    card.rows.push(..._keptRows(hum));
     card.rows.push(..._recRows());
   } else if (hum) {
     card.title = hum.beatTick ? "YOU BEAT THE GAME!" : "CRASHED!";
@@ -585,7 +591,7 @@ function _buildEndCard() {
     card.subtitle = S.runTainted ? taintNote : (S.currentTerrainName || "");
     card.rows.push(["Score", String(scoreOf(hum)), _scoreBadge(hum)], ..._partsRows(hum));
     if (hum.beatTick) card.rows.push(["Finish time", fmtTime(runSeconds(hum)), _timeBadge(hum)]);
-    if (hum.newRec && hum.newRec.kept) card.rows.push(["Map kept in Records", hum.newRec.kept]);
+    card.rows.push(..._keptRows(hum));
     card.rows.push(..._recRows());
   } else if (ai) {
     card.title = ai.beatTick ? "AI BEAT THE GAME!" : "AI CRASHED";
