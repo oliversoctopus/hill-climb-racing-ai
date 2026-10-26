@@ -7,8 +7,13 @@
 // A clean run that beats that track updates it too; a cheated run never touches the
 // clean one. The UI shows the second track behind a "Show cheat records" checkbox.
 //
-// Each map with a record gets a permanent sequential `id` (in the order maps first set a
-// record) and a stored copy of its terrain, so it can be re-loaded from the Records menu.
+// Every map a human run sets something on (or attempts) gets an entry and a stored copy of
+// its terrain, so it can be re-loaded from the Records menu. Only notable maps are listed
+// and kept for good (m.keep, the reason; rules in records_rules.js) or ones you pin
+// (m.pinned); the rest stay unlisted and expire KEEP_DAYS after their last attempt
+// (m.last), unless they're Saved or loaded. A map gets its sequential `id` when it first
+// becomes notable or pinned. Clean and cheat notability are separate: a map notable only
+// through cheats is hidden while cheat records are.
 // Terrains live in IndexedDB (they're the bulky part; localStorage's quota filled up),
 // the small records blob stays in localStorage so the strip and menu can read it synchronously.
 // No names are stored: the label is resolved at display time — the map's current Saved
@@ -17,7 +22,10 @@
 import { S, SCALE, FRAME_RATE } from "./state.js";
 import { getSpawningY, Vec2 } from "./bridge.js";
 import { loadSavedTerrains } from "./saved_terrains.js";
-import { ATTEMPT_SEC, ATTEMPT_SCORE, NEAR_FINISH } from "./records_rules.js";
+import { ATTEMPT_SEC, ATTEMPT_SCORE, NEAR_FINISH, KEEP_DAYS, CHEAT_ATTEMPTS, ladder, finishNotable,
+         fastCutoff } from "./records_rules.js";
+
+const DAY_MS = 24 * 3600 * 1000;
 
 const KEY = "hcr_records_v1";
 const LEGACY_MAPS_KEY = "hcr_record_maps_v1";   // terrains in localStorage, from before IndexedDB
@@ -36,12 +44,14 @@ function _load() {
       for (const m of Object.values(d.maps)) {
         if (!m.all) m.all = _cleanAll(m);   // pre-cheat-track blob
         if (!m.att) m.att = _noAttempts();
+        if (!m.keep) m.keep = { clean: null, cheat: null };
         if (m.last == null) m.last = now;   // written by an older tab: its clock starts now
       }
+      if (!d.finishPool) d.finishPool = {};
       return d;
     }
   } catch (e) { /* corrupt or storage blocked → start fresh */ }
-  return { version: 1, nextId: 1, maps: {} };
+  return { version: 1, schema: 2, nextId: 1, maps: {}, finishPool: {} };
 }
 // The incl.-cheats track, seeded from a map's clean bests.
 function _cleanAll(m) {
@@ -53,7 +63,18 @@ function _cleanAll(m) {
 function _noAttempts() { return { clean: 0, max: 0, n1700: 0, cheat: 0, slow: 0, slowMax: 0 }; }
 function _newEntry() {
   return { id: null, bestScore: 0, bestTime: null, all: _cleanAll({ bestScore: 0, bestTime: null }),
-           att: _noAttempts(), last: Date.now() };
+           att: _noAttempts(), keep: { clean: null, cheat: null }, pinned: false, last: Date.now() };
+}
+function _clean(m) { return m.bestScore > 0 || m.bestTime != null; }
+function _cheatOnly(m) { return !_clean(m) && (m.all.score > 0 || m.all.time != null); }
+function _promote(d, m) { if (m.id == null) m.id = d.nextId++; }
+// Listed in the Records menu without "Show all". A pinned map holding only cheated
+// records is hidden with the cheat records, like any other cheat-only map.
+function _listed(m, showCheats) {
+  return !!(m.keep.clean || (m.pinned && !_cheatOnly(m)) || (showCheats && (m.keep.cheat || m.pinned)));
+}
+function _exempt(key, m, saved) {
+  return !!(m.keep.clean || m.keep.cheat || m.pinned || saved[key] || key === S.mapKey);
 }
 function _save(d) {
   try { localStorage.setItem(KEY, JSON.stringify(d)); return true; }
@@ -222,7 +243,21 @@ export async function initRecords() {
     for (const k of Object.keys(_legacyMaps())) _storedKeys.add(k);
     _warn(`Record maps' terrains couldn't move to IndexedDB (${e && e.message}).`);
   }
+  _expire();
   refreshRecordsStrip();
+}
+// Drop unlisted maps whose last attempt is over KEEP_DAYS old. Only on schema-2 data,
+// whose notability has been worked out (older entries would all look expendable).
+function _expire() {
+  const d = _load();
+  if (d.schema !== 2) return;
+  const saved = _savedNames(), cut = Date.now() - KEEP_DAYS * DAY_MS, gone = [];
+  for (const [k, m] of Object.entries(d.maps)) {
+    if (!_exempt(k, m, saved) && m.last < cut) { delete d.maps[k]; gone.push(k); }
+  }
+  if (!gone.length) return;
+  _save(d);
+  _dropTerrains(gone);
 }
 
 // ---- Labels --------------------------------------------------------------------
@@ -237,24 +272,48 @@ function _label(d, key, saved) {
   const m = key && d.maps[key];
   if (!m) return "";
   // A map holding only cheated records stays anonymous while those are hidden.
-  if (!(m.bestScore > 0 || m.bestTime != null) && !showCheatRecords()) return "";
-  return saved[key] || `Record map ${m.id}`;
+  if (_cheatOnly(m) && !showCheatRecords()) return "";
+  return saved[key] || (m.id != null ? `Record map ${m.id}` : "");
 }
 export function recordMapLabel(key) { return _label(_load(), key, _savedNames()); }
 
-// Every record map for the Records menu, oldest id first. `clean` = has a clean record
-// (a map can hold only cheated ones); `all` = its incl.-cheats track.
+// Every map with an entry for the Records menu, oldest id first (unlisted ones, which have
+// no id, last). `clean` = has a clean record (a map can hold only cheated ones); `all` =
+// its incl.-cheats track; `listed` = shown without "Show all"; `expiresIn` = days left
+// (null when it's kept for good).
 export function listRecordMaps() {
-  const d = _load(), saved = _savedNames(), g = _global(d), ga = _globalAll(d);
+  const d = _load(), saved = _savedNames(), g = _global(d), ga = _globalAll(d), now = Date.now();
+  const show = showCheatRecords();
   return Object.entries(d.maps)
     .map(([key, m]) => ({ key, id: m.id, label: _label(d, key, saved), bestScore: m.bestScore,
                           bestScoreParts: m.bestScoreParts || null,
                           bestTime: m.bestTime, loadable: _storedKeys.has(key),
-                          clean: m.bestScore > 0 || m.bestTime != null, all: m.all,
+                          clean: _clean(m), cheatOnly: _cheatOnly(m), all: m.all, att: m.att, keep: m.keep,
+                          pinned: !!m.pinned,
+                          saved: !!saved[key], listed: _listed(m, show),
+                          expiresIn: _exempt(key, m, saved) ? null
+                                     : Math.max(0, Math.ceil((m.last + KEEP_DAYS * DAY_MS - now) / DAY_MS)),
                           globalScore: key === g.bestScoreKey, globalTime: key === g.bestTimeKey,
                           globalAllScore: key === ga.scoreKey, globalAllTime: key === ga.timeKey }))
-    .sort((a, b) => a.id - b.id);
+    .sort((a, b) => (a.id ?? Infinity) - (b.id ?? Infinity));
 }
+
+// Pin = keep for good and list, without a Saved name. Pinning the loaded map creates its
+// entry if no run has yet. Unpinning returns it to the normal rules, clock included.
+export function setPinned(key, on) {
+  const d = _load();
+  let m = d.maps[key];
+  if (!m) {
+    if (!on || key !== S.mapKey) return;
+    m = d.maps[key] = _newEntry();
+    _storeCurrentMap(key);
+  }
+  m.pinned = !!on;
+  if (on) _promote(d, m);
+  _save(d);
+  refreshRecordsStrip();
+}
+export function isPinned(key) { const m = _load().maps[key]; return !!(m && m.pinned); }
 
 export function mapRecord(key) {
   const m = _load().maps[key];
@@ -315,10 +374,11 @@ export function commitRun(p, score, parts, ended = false) {
   const allTime = time != null && (prev.all.time == null || time < prev.all.time);
   let attempt = null;
   if (ended && !p.attemptCounted) { p.attemptCounted = true; attempt = _attemptKind(p, score, cheated); }
-  if (!betterScore && !betterTime && !allScore && !allTime && !attempt) return;
+  const finishedNow = !cheated && time != null && !p.finishSeen;
+  if (finishedNow) p.finishSeen = true;
+  if (!betterScore && !betterTime && !allScore && !allTime && !attempt && !finishedNow) return;
   if (!d.maps[S.mapKey]) {
     d.maps[S.mapKey] = prev;
-    prev.id = d.nextId++;
     _storeCurrentMap(S.mapKey);
   }
   const m = d.maps[S.mapKey];
@@ -341,8 +401,30 @@ export function commitRun(p, score, parts, ended = false) {
   if (allTime) { m.all.time = time; m.all.timeCheated = cheated; nr.allMapTime = true; }
   if (allScore && score > ga.score) nr.allGlobalScore = true;
   if (allTime && (ga.time == null || time < ga.time)) nr.allGlobalTime = true;
+  // The finish-time pool keeps every map's clean best, even after the map expires, so
+  // pruning slow maps doesn't tighten the fastest-quarter cutoff.
+  if (finishedNow) d.finishPool[S.mapKey] = m.bestTime;
+  const wasKept = !!(m.keep.clean || m.keep.cheat);
+  const why = _keepReasons(d, m, nr, finishedNow);
+  if (!m.keep.clean && why.clean) m.keep.clean = why.clean;
+  if (!m.keep.cheat && why.cheat) m.keep.cheat = why.cheat;
+  if (!wasKept && (m.keep.clean || m.keep.cheat)) { _promote(d, m); nr.kept = m.keep.clean || m.keep.cheat; }
   _save(d);
   refreshRecordsStrip();
+}
+// Why this run makes the map notable, per track (null = it doesn't). Sticky: commitRun
+// only ever sets a reason, so a map stays kept after the finish cutoff tightens.
+function _keepReasons(d, m, nr, finishedNow) {
+  const a = m.att, r = { clean: null, cheat: null };
+  if (nr.globalScore || nr.globalTime) r.clean = "all-maps best";
+  else if (m.bestTime != null) {
+    if (finishedNow && m.bestTime <= fastCutoff(Object.values(d.finishPool))) r.clean = "fastest-quarter finish";
+    else if (finishNotable(a.n1700)) r.clean = `finished, ${a.n1700} runs of ${NEAR_FINISH}+`;
+  } else if (ladder(a.clean, a.max)) r.clean = `${a.clean} attempts, best ${a.max}`;
+  if (nr.cheated && (nr.allGlobalScore || nr.allGlobalTime)) r.cheat = "all-maps best incl. cheats";
+  else if (a.cheat >= CHEAT_ATTEMPTS) r.cheat = `${a.cheat} cheated attempts`;
+  else if (ladder(a.slow, a.slowMax)) r.cheat = `${a.slow} slow-mo attempts, best ${a.slowMax}`;
+  return r;
 }
 
 // The four tiles under the toolbar. Re-run after the Saved list changes so labels follow
@@ -366,6 +448,14 @@ export function refreshRecordsStrip() {
   const sl = _label(d, g.bestScoreKey, saved), tl = _label(d, g.bestTimeKey, saved);
   set("rec_all_score", g.bestScore || "—", `best score · all maps${sl ? ` (${sl})` : ""}`);
   set("rec_all_time",  fmtTime(g.bestTime), `fastest finish · all maps${tl ? ` (${tl})` : ""}`);
+  const pin = document.getElementById("rec_pin");
+  if (pin) {
+    const on = !!(S.mapKey && d.maps[S.mapKey] && d.maps[S.mapKey].pinned);
+    pin.classList.toggle("on", on);
+    pin.disabled = !S.mapKey;
+    pin.title = on ? "Pinned: kept in Records for good. Click to unpin."
+                   : "Pin this map: keep it in Records for good, without saving it";
+  }
   // Labels may have changed (new record map, save/rename/delete) — main.js refreshes the
   // Map chip on this (an event, since sim.js already imports this module).
   document.dispatchEvent(new Event("hcr-records-changed"));

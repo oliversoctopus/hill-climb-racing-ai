@@ -14,7 +14,7 @@ import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerr
          findSavedByName, findSavedByGeometry } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
 import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, deleteRecordMap,
-         fmtTime, showCheatRecords, setShowCheatRecords, initRecords } from "./records.js";
+         fmtTime, showCheatRecords, setShowCheatRecords, initRecords, setPinned, isPinned } from "./records.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
@@ -234,21 +234,29 @@ function closeTerrainMenus() {
   document.getElementById("saved_panel").style.display = "none";
   document.getElementById("records_panel").style.display = "none";
 }
-// Records menu: all-maps bests on top, then every map holding a record (sortable), with
-// Load (exact stored terrain) and Delete.
+// Records menu: all-maps bests on top, then every listed map (sortable), with Load (exact
+// stored terrain), Pin and Delete. "Show all" adds the unlisted maps, with their expiry.
 // With "Show cheat records" on, sort by the incl.-cheats track.
 const _sv = r => (showCheatRecords() ? r.all.score : r.bestScore);
 const _tv = r => (showCheatRecords() ? r.all.time : r.bestTime);
+const _byId = (a, b) => (a.id ?? Infinity) - (b.id ?? Infinity) || (_sv(b) - _sv(a));   // unlisted (no id) last
 const REC_SORTS = {
-  id:    (a, b) => a.id - b.id,
-  score: (a, b) => (_sv(b) - _sv(a)) || (a.id - b.id),
+  id:    _byId,
+  score: (a, b) => (_sv(b) - _sv(a)) || _byId(a, b),
   // fastest finish first; unfinished maps last, among themselves by best score
   time:  (a, b) => ((_tv(a) == null) - (_tv(b) == null)) ||
                    (_tv(a) != null ? _tv(a) - _tv(b) : 0) ||
-                   (_sv(b) - _sv(a)) || (a.id - b.id),
+                   (_sv(b) - _sv(a)) || _byId(a, b),
 };
-let _recSort = "id";
+let _recSort = "id", _recShowAll = false;
 try { const v = localStorage.getItem("hcr_records_sort"); if (REC_SORTS[v]) _recSort = v; } catch (e) {}
+try { _recShowAll = localStorage.getItem("hcr_records_show_all") === "1"; } catch (e) {}
+function _recNote(r) {
+  if (r.expiresIn != null) return r.expiresIn === 0 ? "expires today" : `expires in ${r.expiresIn} day${r.expiresIn === 1 ? "" : "s"}`;
+  if (r.pinned) return "pinned";
+  if (r.keep.clean || r.keep.cheat) return `kept: ${r.keep.clean || r.keep.cheat}`;
+  return r.saved ? "kept: saved" : "kept while loaded";
+}
 function _recTile(val, sub, isTime) {
   const t = document.createElement("div");
   t.className = "rec" + (isTime ? " time" : "");
@@ -263,20 +271,22 @@ function renderRecordsMenu() {
   for (const b of document.querySelectorAll("#records_sort button")) b.classList.toggle("active", b.dataset.sort === _recSort);
   const show = showCheatRecords();
   document.getElementById("records_show_cheats").checked = show;
+  document.getElementById("records_show_all").checked = _recShowAll;
   const all = listRecordMaps();
-  const maps = show ? all : all.filter(r => r.clean);   // a map can hold only cheated records
+  const visible = show ? all : all.filter(r => !r.cheatOnly);   // a map can hold only cheated records
+  const maps = visible.filter(r => r.listed || _recShowAll);
   list.innerHTML = ""; summary.innerHTML = "";
-  if (!maps.length) {
+  if (!visible.length) {
     list.innerHTML = '<div class="menu-empty">No records yet. Drive a map (no cheats) and your best score and fastest finish land here.</div>';
     return;
   }
-  const topScore = maps.find(r => r.globalScore), topTime = maps.find(r => r.globalTime);
+  const topScore = visible.find(r => r.globalScore), topTime = visible.find(r => r.globalTime);
   summary.append(
     _recTile(topScore ? topScore.bestScore : "—", `best score · any map${topScore ? ` (${topScore.label})` : ""}`),
     _recTile(topTime ? fmtTime(topTime.bestTime) : "—", `best time · any map${topTime ? ` (${topTime.label})` : " — no finishes yet"}`, true));
   if (show) {
     // The incl.-cheats bests; red + ⚠ when a cheated run holds them.
-    const aS = maps.find(r => r.globalAllScore), aT = maps.find(r => r.globalAllTime);
+    const aS = visible.find(r => r.globalAllScore), aT = visible.find(r => r.globalAllTime);
     const tS = _recTile(aS ? (aS.all.scoreCheated ? "⚠" : "") + aS.all.score : "—",
                         `best score · incl. cheats${aS ? ` (${aS.label})` : ""}`);
     const tT = _recTile(aT ? (aT.all.timeCheated ? "⚠" : "") + fmtTime(aT.all.time) : "—",
@@ -297,16 +307,24 @@ function renderRecordsMenu() {
     head.appendChild(c);
   }
   list.appendChild(head);
+  if (!maps.length) {
+    list.insertAdjacentHTML("beforeend", '<div class="menu-empty">No maps kept yet. A map is kept once you finish it ' +
+      'fast, keep retrying it, or pin it; tick <b>Show all</b> to see the rest.</div>');
+  }
 
   for (const r of maps.slice().sort(REC_SORTS[_recSort])) {
     const row = document.createElement("div");
-    row.className = "terrain-row rec-row";
+    row.className = "terrain-row rec-row" + (r.listed ? "" : " unlisted");
     const id = document.createElement("span");
-    id.className = "rec-id"; id.textContent = `#${r.id}`;
+    id.className = "rec-id"; id.textContent = r.id != null ? `#${r.id}` : "—";
     const nm = document.createElement("span");
     nm.className = "terrain-name";
-    nm.textContent = r.label + (r.key === S.mapKey ? "  (current)" : "");
-    nm.title = nm.textContent;
+    nm.textContent = (r.label || "Unlisted map") + (r.key === S.mapKey ? "  (current)" : "");
+    const note = document.createElement("small");
+    note.className = "rec-note" + (r.expiresIn != null ? " expiring" : "");
+    note.textContent = _recNote(r);
+    nm.title = `${nm.textContent} · ${note.textContent}`;
+    nm.appendChild(note);
     const stat = (cls, text, top, tip) => {
       const e = document.createElement("span");
       e.className = cls;
@@ -344,10 +362,14 @@ function renderRecordsMenu() {
     load.textContent = "Load";
     load.dataset.recLoad = r.key;
     if (!r.loadable) { load.disabled = true; load.title = "This map's terrain wasn't stored (older record, or storage was full)"; }
+    const pin = document.createElement("button");
+    pin.textContent = "📌"; pin.className = "rec-pin-btn" + (r.pinned ? " on" : "");
+    pin.dataset.recPin = r.key;
+    pin.title = r.pinned ? "Pinned: kept for good. Click to unpin." : "Pin: keep this map for good, without saving it";
     const del = document.createElement("button");
     del.textContent = "Delete"; del.className = "danger";
     del.dataset.recDel = r.key;
-    acts.append(load, del);
+    acts.append(load, pin, del);
     row.append(id, nm, sc, tm, acts);
     list.appendChild(row);
 
@@ -401,6 +423,16 @@ function openRecordsMenu() {
 document.addEventListener("hcr-records-changed", updateCurrentTerrainBox);
 // "Show cheat records": one setting, two checkboxes (Records menu + end card).
 document.getElementById("records_show_cheats").onchange = (e) => setShowCheatRecords(e.target.checked);
+document.getElementById("records_show_all").onchange = (e) => {
+  _recShowAll = e.target.checked;
+  try { localStorage.setItem("hcr_records_show_all", _recShowAll ? "1" : "0"); } catch (err) {}
+  renderRecordsMenu();
+};
+document.getElementById("rec_pin").onclick = () => {
+  if (S.mapKey) setPinned(S.mapKey, !isPinned(S.mapKey));
+  if (document.getElementById("records_panel").style.display === "block") renderRecordsMenu();
+  focusGame();
+};
 document.querySelector("#endcard_cheats input").onchange = (e) => { setShowCheatRecords(e.target.checked); focusGame(); };
 document.addEventListener("hcr-cheat-records-toggled", () => {
   if (document.getElementById("records_panel").style.display === "block") renderRecordsMenu();
@@ -419,10 +451,13 @@ document.getElementById("records_list").onclick = (e) => {
     const key = el.dataset.recLoad;
     recordMapSource(key).then(src => {
       if (!src) { setStatus("That map's terrain wasn't stored, so it can't be loaded."); return; }
-      loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(key) });
+      loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(key) || "Unlisted map" });
     });
+  } else if (el.dataset.recPin !== undefined) {
+    setPinned(el.dataset.recPin, !isPinned(el.dataset.recPin));
+    renderRecordsMenu();
   } else if (el.dataset.recDel !== undefined) {
-    const label = recordMapLabel(el.dataset.recDel);
+    const label = recordMapLabel(el.dataset.recDel) || "this unlisted map";
     if (!window.confirm(`Delete your records on “${label}”? This can't be undone.`)) return;
     deleteRecordMap(el.dataset.recDel);
     renderRecordsMenu();

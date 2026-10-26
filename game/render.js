@@ -577,6 +577,7 @@ function _buildEndCard() {
     if (S.runTainted) card.subtitle = taintNote;
     card.rows.push(["You  (score · time)", _runLine(hum), _scoreBadge(hum) || _timeBadge(hum)], ..._partsRows(hum));
     card.rows.push(["AI  (score · time)", _runLine(ai)], ..._partsRows(ai));
+    if (hum.newRec && hum.newRec.kept) card.rows.push(["Map kept in Records", hum.newRec.kept]);
     card.rows.push(..._recRows());
   } else if (hum) {
     card.title = hum.beatTick ? "YOU BEAT THE GAME!" : "CRASHED!";
@@ -584,6 +585,7 @@ function _buildEndCard() {
     card.subtitle = S.runTainted ? taintNote : (S.currentTerrainName || "");
     card.rows.push(["Score", String(scoreOf(hum)), _scoreBadge(hum)], ..._partsRows(hum));
     if (hum.beatTick) card.rows.push(["Finish time", fmtTime(runSeconds(hum)), _timeBadge(hum)]);
+    if (hum.newRec && hum.newRec.kept) card.rows.push(["Map kept in Records", hum.newRec.kept]);
     card.rows.push(..._recRows());
   } else if (ai) {
     card.title = ai.beatTick ? "AI BEAT THE GAME!" : "AI CRASHED";

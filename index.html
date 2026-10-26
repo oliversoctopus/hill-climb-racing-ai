@@ -118,7 +118,8 @@
 
   <section class="records" aria-label="Your records">
     <button class="records-title" id="records_title_btn" title="Open the Records menu">Your records<small>human runs, no cheats · view all ›</small></button>
-    <div class="rec" id="rec_map_score"><div class="rec-val">—</div><div class="rec-sub">best score · this map</div></div>
+    <div class="rec" id="rec_map_score"><div class="rec-val">—</div><div class="rec-sub">best score · this map</div>
+      <button id="rec_pin" class="rec-pin" title="Pin this map: keep it in Records for good, without saving it">📌</button></div>
     <div class="rec time" id="rec_map_time"><div class="rec-val">—</div><div class="rec-sub">fastest finish · this map</div></div>
     <div class="rec" id="rec_all_score"><div class="rec-val">—</div><div class="rec-sub">best score · all maps</div></div>
     <div class="rec time" id="rec_all_time"><div class="rec-val">—</div><div class="rec-sub">fastest finish · all maps</div></div>
@@ -282,7 +283,8 @@
 </div>
 <div id="records_panel" class="hcr-modal">
   <div class="modal-title">🏆 Record maps</div>
-  <div class="modal-note">Every map you've set a record on, in the order you first set one.
+  <div class="modal-note">Maps worth keeping: a fastest-quarter finish, a map you keep retrying, an all-maps best,
+    or one you <b>📌 pin</b>. Every other map you play stays unlisted for 7 days after your last attempt.
     Saved maps show their Saved name. <b>Load</b> a map to try to beat your record on it.</div>
   <div id="records_summary" class="rec-summary"></div>
   <div class="rec-sortbar">
@@ -294,6 +296,8 @@
     </div>
     <label class="rec-cheat-toggle" title="Also show records set with cheats (⚠ red = a cheated run set it)">
       <input type="checkbox" id="records_show_cheats"> Show cheat records</label>
+    <label class="rec-all-toggle" title="Also show unlisted maps, which expire 7 days after your last attempt">
+      <input type="checkbox" id="records_show_all"> Show all</label>
   </div>
   <div id="records_list" class="menu-list"></div>
   <div class="modal-footer"><button id="records_close">Close (Esc)</button></div>
