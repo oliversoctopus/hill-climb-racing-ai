@@ -9,6 +9,8 @@
 //
 // Each map with a record gets a permanent sequential `id` (in the order maps first set a
 // record) and a stored copy of its terrain, so it can be re-loaded from the Records menu.
+// Terrains live in IndexedDB (they're the bulky part; localStorage's quota filled up),
+// the small records blob stays in localStorage so the strip and menu can read it synchronously.
 // No names are stored: the label is resolved at display time — the map's current Saved
 // name if it's saved, else "Record map <id>". The all-maps bests are derived from the
 // per-map entries, so deleting a record map can't leave a stale global.
@@ -17,7 +19,7 @@ import { getSpawningY, Vec2 } from "./bridge.js";
 import { loadSavedTerrains } from "./saved_terrains.js";
 
 const KEY = "hcr_records_v1";
-const MAPS_KEY = "hcr_record_maps_v1";   // key → stored terrain (kept apart: it's the bulky part)
+const LEGACY_MAPS_KEY = "hcr_record_maps_v1";   // terrains in localStorage, from before IndexedDB
 
 function _load() {
   try {
@@ -40,7 +42,16 @@ function _cleanAll(m) {
   return { score: m.bestScore, scoreCheated: false, scoreParts: m.bestScoreParts || null,
            time: m.bestTime, timeCheated: false };
 }
-function _save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
+function _save(d) {
+  try { localStorage.setItem(KEY, JSON.stringify(d)); return true; }
+  catch (e) { _warn("Records not saved: browser storage is full or blocked."); return false; }
+}
+// A failed write must be visible: a silently dropped record looks like "no record on this map".
+function _warn(msg) {
+  console.warn(`[records] ${msg}`);
+  const el = document.getElementById("status");
+  if (el) el.textContent = msg;
+}
 
 // Best score / fastest finish over all maps, with the key of the map holding each.
 function _global(d) {
@@ -105,11 +116,28 @@ function _b64ToF64(b64) {
   for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
   return Array.from(new Float64Array(u8.buffer));
 }
-function _loadMaps() {
-  try { return JSON.parse(localStorage.getItem(MAPS_KEY) || "{}") || {}; } catch (e) { return {}; }
+// IndexedDB "hcr_records": "terrains" (map key → stored terrain) and "backup" (the
+// localStorage blobs as they were before the move, kept in case the migration misbehaved).
+const _req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+let _dbp = null;
+function _db() {
+  if (!_dbp) {
+    const r = indexedDB.open("hcr_records", 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore("terrains"); r.result.createObjectStore("backup"); };
+    _dbp = _req(r);
+  }
+  return _dbp;
 }
-function _saveMaps(all) {
-  try { localStorage.setItem(MAPS_KEY, JSON.stringify(all)); return true; } catch (e) { return false; }
+async function _tx(store, mode, fn) {
+  const t = (await _db()).transaction(store, mode);
+  const out = fn(t.objectStore(store));
+  await new Promise((res, rej) => { t.oncomplete = res; t.onerror = t.onabort = () => rej(t.error); });
+  return out;
+}
+const _storedKeys = new Set();   // keys with a terrain in IndexedDB, filled by initRecords()
+
+function _legacyMaps() {
+  try { return JSON.parse(localStorage.getItem(LEGACY_MAPS_KEY) || "{}") || {}; } catch (e) { return {}; }
 }
 function _regularXs(g, n) {
   const xs = [];
@@ -118,12 +146,11 @@ function _regularXs(g, n) {
   return xs;
 }
 function _storeCurrentMap(key) {
-  const all = _loadMaps();
-  if (all[key]) return true;
+  if (_storedKeys.has(key)) return;
   const g = S.ground, n = g.vectors.length;
   const reg = _regularXs(g, n);
   const regular = g.vectors.every((v, i) => v.x === reg[i]);
-  all[key] = {
+  const t = {
     n, smoothness: g.smoothness, distance: g.distance,
     xs: regular ? null : _f64ToB64(g.vectors.map(v => v.x)),
     ys: _f64ToB64(g.vectors.map(v => v.y)),
@@ -131,11 +158,17 @@ function _storeCurrentMap(key) {
     spawning_y: getSpawningY(),
     tuned: !!g.tuned,   // a physics-playground map: runs on it stay "cheated" when re-loaded
   };
-  return _saveMaps(all);   // false = storage full; the record still counts, just can't be re-loaded
+  _storedKeys.add(key);
+  _tx("terrains", "readwrite", s => s.put(t, key)).catch(e => {
+    _storedKeys.delete(key);   // the record still counts; the map just can't be re-loaded
+    _warn(`This map's terrain wasn't stored (${e && e.message}), so it can't be re-loaded from Records.`);
+  });
 }
 // A Ground.cloneFrom() source for a record map, or null if its terrain wasn't stored.
-export function recordMapSource(key) {
-  const t = _loadMaps()[key];
+export async function recordMapSource(key) {
+  let t = null;
+  try { t = await _tx("terrains", "readonly", s => s.get(key)).then(r => r.result); } catch (e) {}
+  if (!t) t = _legacyMaps()[key];   // not migrated yet (IndexedDB unavailable)
   if (!t) return null;
   try {
     const ys = _b64ToF64(t.ys);
@@ -145,13 +178,37 @@ export function recordMapSource(key) {
              spawning_y: t.spawning_y, tuned: !!t.tuned };
   } catch (e) { return null; }
 }
+function _dropTerrains(keys) {
+  for (const k of keys) _storedKeys.delete(k);
+  _tx("terrains", "readwrite", s => { for (const k of keys) s.delete(k); }).catch(() => {});
+}
 export function deleteRecordMap(key) {
   const d = _load();
   delete d.maps[key];
   _save(d);
-  const all = _loadMaps();
-  delete all[key];
-  _saveMaps(all);
+  _dropTerrains([key]);
+  refreshRecordsStrip();
+}
+
+// Startup: move terrains out of localStorage (backing up both blobs first), then index
+// what's stored. An older tab may still write the legacy key, so this runs on every load.
+export async function initRecords() {
+  try {
+    const raw = localStorage.getItem(LEGACY_MAPS_KEY);
+    if (raw) {
+      const have = await _tx("backup", "readonly", s => s.get("v1")).then(r => r.result);
+      if (!have) await _tx("backup", "readwrite", s => s.put({ records: localStorage.getItem(KEY), maps: raw,
+                                                              at: new Date().toISOString() }, "v1"));
+      const legacy = JSON.parse(raw) || {};
+      await _tx("terrains", "readwrite", s => { for (const [k, t] of Object.entries(legacy)) s.put(t, k); });
+      localStorage.removeItem(LEGACY_MAPS_KEY);
+    }
+    const keys = await _tx("terrains", "readonly", s => s.getAllKeys()).then(r => r.result);
+    for (const k of keys) _storedKeys.add(k);
+  } catch (e) {
+    for (const k of Object.keys(_legacyMaps())) _storedKeys.add(k);
+    _warn(`Record maps' terrains couldn't move to IndexedDB (${e && e.message}).`);
+  }
   refreshRecordsStrip();
 }
 
@@ -175,11 +232,11 @@ export function recordMapLabel(key) { return _label(_load(), key, _savedNames())
 // Every record map for the Records menu, oldest id first. `clean` = has a clean record
 // (a map can hold only cheated ones); `all` = its incl.-cheats track.
 export function listRecordMaps() {
-  const d = _load(), saved = _savedNames(), stored = _loadMaps(), g = _global(d), ga = _globalAll(d);
+  const d = _load(), saved = _savedNames(), g = _global(d), ga = _globalAll(d);
   return Object.entries(d.maps)
     .map(([key, m]) => ({ key, id: m.id, label: _label(d, key, saved), bestScore: m.bestScore,
                           bestScoreParts: m.bestScoreParts || null,
-                          bestTime: m.bestTime, loadable: !!stored[key],
+                          bestTime: m.bestTime, loadable: _storedKeys.has(key),
                           clean: m.bestScore > 0 || m.bestTime != null, all: m.all,
                           globalScore: key === g.bestScoreKey, globalTime: key === g.bestTimeKey,
                           globalAllScore: key === ga.scoreKey, globalAllTime: key === ga.timeKey }))

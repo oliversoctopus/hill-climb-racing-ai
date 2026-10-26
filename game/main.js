@@ -14,7 +14,7 @@ import { loadSavedTerrains, addSavedTerrain, removeSavedTerrain, renameSavedTerr
          findSavedByName, findSavedByGeometry } from "./saved_terrains.js";
 import { render, updateStats } from "./render.js";
 import { refreshRecordsStrip, listRecordMaps, recordMapSource, recordMapLabel, deleteRecordMap,
-         fmtTime, showCheatRecords, setShowCheatRecords } from "./records.js";
+         fmtTime, showCheatRecords, setShowCheatRecords, initRecords } from "./records.js";
 import { runBestOfX, watchSelectedRun, _bestofxPanelVisible, runBacktrack } from "./search.js";
 import {
   bpSetStatus, bpSetZeroG, bpFloatCar, bpUnderworld, bpStop, bpToggleExit,
@@ -416,9 +416,11 @@ document.getElementById("records_list").onclick = (e) => {
     if (_recExpanded.has(k)) _recExpanded.delete(k); else _recExpanded.add(k);
     renderRecordsMenu();
   } else if (el.dataset.recLoad !== undefined) {
-    const src = recordMapSource(el.dataset.recLoad);
-    if (!src) { setStatus("That map's terrain wasn't stored, so it can't be loaded."); return; }
-    loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(el.dataset.recLoad) });
+    const key = el.dataset.recLoad;
+    recordMapSource(key).then(src => {
+      if (!src) { setStatus("That map's terrain wasn't stored, so it can't be loaded."); return; }
+      loadTerrainObject({ source: src, spawning_y: src.spawning_y, name: recordMapLabel(key) });
+    });
   } else if (el.dataset.recDel !== undefined) {
     const label = recordMapLabel(el.dataset.recDel);
     if (!window.confirm(`Delete your records on “${label}”? This can't be undone.`)) return;
@@ -726,6 +728,7 @@ document.getElementById("bp_unmask").onclick = () =>
 document.getElementById("bp_motorspin").onclick = () => setTune({ motorSpeed: 2 });
 initDevMode({ loadTerrain: loadTerrainObject });
 initHumanRuns();
+initRecords();
 
 // Keybinds cheat-sheet overlay.
 document.getElementById("keybinds_btn").onclick = () => {
