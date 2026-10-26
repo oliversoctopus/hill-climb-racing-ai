@@ -17,6 +17,7 @@
 import { S, SCALE, FRAME_RATE } from "./state.js";
 import { getSpawningY, Vec2 } from "./bridge.js";
 import { loadSavedTerrains } from "./saved_terrains.js";
+import { ATTEMPT_SEC, ATTEMPT_SCORE, NEAR_FINISH } from "./records_rules.js";
 
 const KEY = "hcr_records_v1";
 const LEGACY_MAPS_KEY = "hcr_record_maps_v1";   // terrains in localStorage, from before IndexedDB
@@ -31,7 +32,12 @@ function _load() {
         d.nextId = id;
       }
       delete d.global;           // now derived (see _global)
-      for (const m of Object.values(d.maps)) if (!m.all) m.all = _cleanAll(m);   // pre-cheat-track blob
+      const now = Date.now();
+      for (const m of Object.values(d.maps)) {
+        if (!m.all) m.all = _cleanAll(m);   // pre-cheat-track blob
+        if (!m.att) m.att = _noAttempts();
+        if (m.last == null) m.last = now;   // written by an older tab: its clock starts now
+      }
       return d;
     }
   } catch (e) { /* corrupt or storage blocked → start fresh */ }
@@ -41,6 +47,13 @@ function _load() {
 function _cleanAll(m) {
   return { score: m.bestScore, scoreCheated: false, scoreParts: m.bestScoreParts || null,
            time: m.bestTime, timeCheated: false };
+}
+// Attempt counters (records_rules.js says what counts). Slow-mo-only runs are cheated
+// attempts, and also tracked on their own (slow, slowMax) since their physics is stock.
+function _noAttempts() { return { clean: 0, max: 0, n1700: 0, cheat: 0, slow: 0, slowMax: 0 }; }
+function _newEntry() {
+  return { id: null, bestScore: 0, bestTime: null, all: _cleanAll({ bestScore: 0, bestTime: null }),
+           att: _noAttempts(), last: Date.now() };
 }
 function _save(d) {
   try { localStorage.setItem(KEY, JSON.stringify(d)); return true; }
@@ -274,29 +287,50 @@ export function physicsModified() {
       || !!(S.ground && S.ground.tuned);   // a playground-generated map (flat/short/...)
 }
 
+// "clean", "cheat" or null (an abandon). Runs that only used slow-mo are cheated runs;
+// S.runModified tells them apart from physics cheats.
+function _attemptKind(p, score, cheated) {
+  if ((p.deadTick || S.tickCount) < ATTEMPT_SEC * FRAME_RATE) return null;
+  if (cheated) return "cheat";
+  return score >= ATTEMPT_SCORE ? "clean" : null;
+}
+
 // Fold a human player's run into the stored records. Idempotent (max/min), so it's safe
 // to call on finish, on death, and again when the run is abandoned. New-record flags
 // are OR-ed onto p.newRec for the end card (clean: mapScore/globalScore/...; incl.-cheats
-// track: allMapScore/allGlobalScore/...). A map only gets an entry (id + stored terrain)
-// once a run actually sets something on it. `parts` (sim.scoreParts: to finish / fly-off /
+// track: allMapScore/allGlobalScore/...). A map only gets an entry (stored terrain) once a
+// run sets something or counts as an attempt on it. `parts` (sim.scoreParts: to finish / fly-off /
 // after fly-off, or null if unfinished) is stored with each score record it sets.
-export function commitRun(p, score, parts) {
+// `ended` (death or abandon) is when the run is counted as an attempt, once per run.
+export function commitRun(p, score, parts, ended = false) {
   if (!p || p.isAI || !S.mapKey) return;
   const cheated = S.runTainted;
   const time = p.beatTick ? p.beatTick / FRAME_RATE : null;
   const d = _load();
   const g = _global(d), ga = _globalAll(d);
-  const prev = d.maps[S.mapKey] || { bestScore: 0, bestTime: null, all: _cleanAll({ bestScore: 0, bestTime: null }) };
+  const prev = d.maps[S.mapKey] || _newEntry();
   const betterScore = !cheated && score > prev.bestScore;
   const betterTime = !cheated && time != null && (prev.bestTime == null || time < prev.bestTime);
   const allScore = score > prev.all.score;
   const allTime = time != null && (prev.all.time == null || time < prev.all.time);
-  if (!betterScore && !betterTime && !allScore && !allTime) return;
+  let attempt = null;
+  if (ended && !p.attemptCounted) { p.attemptCounted = true; attempt = _attemptKind(p, score, cheated); }
+  if (!betterScore && !betterTime && !allScore && !allTime && !attempt) return;
   if (!d.maps[S.mapKey]) {
-    d.maps[S.mapKey] = { id: d.nextId++, bestScore: 0, bestTime: null, all: prev.all };
+    d.maps[S.mapKey] = prev;
+    prev.id = d.nextId++;
     _storeCurrentMap(S.mapKey);
   }
   const m = d.maps[S.mapKey];
+  m.last = Date.now();
+  const a = m.att;
+  if (attempt === "clean") {
+    a.clean += 1; a.max = Math.max(a.max, score);
+    if (score >= NEAR_FINISH) a.n1700 += 1;
+  } else if (attempt === "cheat") {
+    a.cheat += 1;
+    if (!S.runModified && score >= ATTEMPT_SCORE) { a.slow += 1; a.slowMax = Math.max(a.slowMax, score); }
+  }
   const nr = p.newRec || (p.newRec = {});
   nr.cheated = cheated;
   if (betterScore) { m.bestScore = score; m.bestScoreParts = parts || null; nr.mapScore = true; }

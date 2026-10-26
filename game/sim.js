@@ -299,7 +299,7 @@ function spawnPlayers(spawnDx, spawnDy) {
 export function buildWithGround(sourceGround, sourceSpawningY, spawnDx, spawnDy) {
   S.worldGen += 1;  // invalidates any in-flight runOneStep awaiting from the old world
   // An abandoned human run (Restart/Regenerate mid-drive) still counts toward records.
-  for (const p of S.players) if (!p.isAI && !p.dead) { commitRun(p, scoreOf(p), scoreParts(p)); hrFinish(p, "abandoned"); }
+  for (const p of S.players) if (!p.isAI && !p.dead) { commitRun(p, scoreOf(p), scoreParts(p), true); hrFinish(p, "abandoned"); }
   S.bpZeroG = false;  // fresh world has normal gravity; clear any stale float state
   S.world = new b2World(new Vec2(0, 10), false);
   S.listener = makeContactListener(S.world);
@@ -543,7 +543,7 @@ export async function runOneStep() {
     if (p.dead) continue;
     const hadBeat = p.beatTick;
     _checkPlayerEndOfStep(p);
-    if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p), scoreParts(p));
+    if (!p.isAI && (p.dead || (p.beatTick && !hadBeat))) commitRun(p, scoreOf(p), scoreParts(p), p.dead);
     if (!p.isAI) hrAfterTick(p);
     if (!p.dead) allDead = false;
   }
